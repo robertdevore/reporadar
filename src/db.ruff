@@ -1,0 +1,119 @@
+// db.ruff — RepoRadar Database Layer
+// Handles SQLite schema creation, migrations, and query helpers.
+
+/// get_db_path returns the path to the SQLite database file.
+/// Uses REPORADAR_DB env var if set, otherwise defaults to reporadar.db in the current directory.
+export func get_db_path() {
+	mut home = env_or("HOME", ".")
+	mut db_path = env_or("REPORADAR_DB", join_path(home, ".reporadar.db"))
+	return db_path
+}
+
+/// init_db creates/opens the database and ensures the schema is up to date.
+/// Returns the database connection.
+export func init_db() {
+	mut db_path = get_db_path()
+	mut db_exists = file_exists(db_path)
+
+	mut db = db_connect("sqlite", db_path)
+
+	if !db_exists {
+		create_schema(db)
+	} else {
+		ensure_schema(db)
+	}
+
+	return db
+}
+
+/// create_schema creates all tables from scratch.
+export func create_schema(db) {
+	db_execute(db, "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))")
+
+	db_execute(db, "CREATE TABLE IF NOT EXISTS repos (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_name TEXT, path TEXT NOT NULL UNIQUE, group_name TEXT DEFAULT '', tags TEXT DEFAULT '', notes TEXT DEFAULT '', pinned INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), last_scan_at TEXT, last_error TEXT)")
+
+	db_execute(db, "CREATE TABLE IF NOT EXISTS repo_status_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, scanned_at TEXT NOT NULL DEFAULT (datetime('now')), branch TEXT, default_branch TEXT, remote_url TEXT, upstream_branch TEXT, latest_commit_hash TEXT, latest_commit_short_hash TEXT, latest_commit_message TEXT, latest_commit_author TEXT, latest_commit_date TEXT, is_clean INTEGER DEFAULT 0, staged_count INTEGER DEFAULT 0, unstaged_count INTEGER DEFAULT 0, untracked_count INTEGER DEFAULT 0, changed_total INTEGER DEFAULT 0, ahead_count INTEGER DEFAULT 0, behind_count INTEGER DEFAULT 0, is_diverged INTEGER DEFAULT 0, is_detached INTEGER DEFAULT 0, has_remote INTEGER DEFAULT 0, scan_error TEXT, FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE)")
+
+	db_execute(db, "CREATE TABLE IF NOT EXISTS repo_file_changes (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, snapshot_id INTEGER NOT NULL, file_path TEXT NOT NULL, status_code TEXT NOT NULL, status_label TEXT NOT NULL, staged INTEGER DEFAULT 0, unstaged INTEGER DEFAULT 0, untracked INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE, FOREIGN KEY (snapshot_id) REFERENCES repo_status_snapshots(id) ON DELETE CASCADE)")
+
+	db_execute(db, "CREATE TABLE IF NOT EXISTS repo_commits (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, commit_hash TEXT NOT NULL, short_hash TEXT NOT NULL, author TEXT NOT NULL, date TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE)")
+
+	db_execute(db, "CREATE TABLE IF NOT EXISTS scan_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, started_at TEXT NOT NULL DEFAULT (datetime('now')), completed_at TEXT, repo_count INTEGER DEFAULT 0, success_count INTEGER DEFAULT 0, error_count INTEGER DEFAULT 0, dirty_count INTEGER DEFAULT 0, clean_count INTEGER DEFAULT 0, notes TEXT DEFAULT '')")
+
+	db_execute(db, "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+
+	// Insert default settings
+	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('stale_threshold_days', '14')")
+	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('default_activity_window', '7')")
+	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('ignored_folders', 'node_modules,vendor,.cache,dist,build,.git')")
+	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('enable_write_actions', 'false')")
+	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('default_sort_column', 'name')")
+	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('default_sort_order', 'asc')")
+
+	// Record schema version
+	db_execute(db, "INSERT INTO schema_version (version) VALUES (1)")
+
+	print("Database initialized at: " + get_db_path())
+}
+
+/// ensure_schema checks if the schema needs migration and applies it.
+export func ensure_schema(db) {
+	mut version_rows = db_query(db, "SELECT MAX(version) as version FROM schema_version")
+	mut current_version = 0
+	if len(version_rows) > 0 {
+		mut row = version_rows[0]
+		if has_key(row, "version") == 1 {
+			if row["version"] != null {
+				current_version = to_int(row["version"])
+			}
+		}
+	}
+
+	if current_version < 1 {
+		db_execute(db, "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))")
+	}
+
+	// Ensure all tables exist (idempotent)
+	db_execute(db, "CREATE TABLE IF NOT EXISTS repos (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_name TEXT, path TEXT NOT NULL UNIQUE, group_name TEXT DEFAULT '', tags TEXT DEFAULT '', notes TEXT DEFAULT '', pinned INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), last_scan_at TEXT, last_error TEXT)")
+
+	db_execute(db, "CREATE TABLE IF NOT EXISTS repo_status_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, scanned_at TEXT NOT NULL DEFAULT (datetime('now')), branch TEXT, default_branch TEXT, remote_url TEXT, upstream_branch TEXT, latest_commit_hash TEXT, latest_commit_short_hash TEXT, latest_commit_message TEXT, latest_commit_author TEXT, latest_commit_date TEXT, is_clean INTEGER DEFAULT 0, staged_count INTEGER DEFAULT 0, unstaged_count INTEGER DEFAULT 0, untracked_count INTEGER DEFAULT 0, changed_total INTEGER DEFAULT 0, ahead_count INTEGER DEFAULT 0, behind_count INTEGER DEFAULT 0, is_diverged INTEGER DEFAULT 0, is_detached INTEGER DEFAULT 0, has_remote INTEGER DEFAULT 0, scan_error TEXT, FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE)")
+
+	db_execute(db, "CREATE TABLE IF NOT EXISTS repo_file_changes (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, snapshot_id INTEGER NOT NULL, file_path TEXT NOT NULL, status_code TEXT NOT NULL, status_label TEXT NOT NULL, staged INTEGER DEFAULT 0, unstaged INTEGER DEFAULT 0, untracked INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE, FOREIGN KEY (snapshot_id) REFERENCES repo_status_snapshots(id) ON DELETE CASCADE)")
+
+	db_execute(db, "CREATE TABLE IF NOT EXISTS repo_commits (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, commit_hash TEXT NOT NULL, short_hash TEXT NOT NULL, author TEXT NOT NULL, date TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE)")
+
+	db_execute(db, "CREATE TABLE IF NOT EXISTS scan_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, started_at TEXT NOT NULL DEFAULT (datetime('now')), completed_at TEXT, repo_count INTEGER DEFAULT 0, success_count INTEGER DEFAULT 0, error_count INTEGER DEFAULT 0, dirty_count INTEGER DEFAULT 0, clean_count INTEGER DEFAULT 0, notes TEXT DEFAULT '')")
+
+	db_execute(db, "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+
+	// Insert default settings if missing
+	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('stale_threshold_days', '14')")
+	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('default_activity_window', '7')")
+	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('ignored_folders', 'node_modules,vendor,.cache,dist,build,.git')")
+	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('enable_write_actions', 'false')")
+	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('default_sort_column', 'name')")
+	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('default_sort_order', 'asc')")
+
+	if current_version < 1 {
+		db_execute(db, "INSERT INTO schema_version (version) VALUES (1)")
+	}
+}
+
+/// get_setting retrieves a setting value by key, with an optional default.
+export func get_setting(db, key, default_value) {
+	mut rows = db_query(db, "SELECT value FROM settings WHERE key = '" + key + "'")
+	if len(rows) > 0 {
+		return rows[0]["value"]
+	}
+	return default_value
+}
+
+/// set_setting updates or inserts a setting.
+export func set_setting(db, key, value) {
+	mut rows = db_query(db, "SELECT key FROM settings WHERE key = '" + key + "'")
+	if len(rows) > 0 {
+		db_execute(db, "UPDATE settings SET value = '" + value + "' WHERE key = '" + key + "'")
+	} else {
+		db_execute(db, "INSERT INTO settings (key, value) VALUES ('" + key + "', '" + value + "')")
+	}
+}

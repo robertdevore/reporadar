@@ -1,0 +1,168 @@
+// RepoRadar Scanner Unit Tests
+// Run: ruff test-run tests/test_scanner.ruff
+
+from src.scanner import parse_git_status, validate_repo_path
+
+// === parse_git_status Tests ===
+
+test_group "parse_git_status — Clean Repo" {
+	test "clean repo on main branch" {
+		let output = "## main"
+		let result = parse_git_status(output)
+		assert_equal(result["branch"], "main")
+		assert_equal(result["is_clean"], 1)
+		assert_equal(result["changed_total"], 0)
+		assert_equal(result["staged_count"], 0)
+		assert_equal(result["unstaged_count"], 0)
+		assert_equal(result["untracked_count"], 0)
+		assert_equal(result["ahead_count"], 0)
+		assert_equal(result["behind_count"], 0)
+		assert_equal(result["upstream"], "")
+	}
+
+	test "clean repo with upstream tracking" {
+		let output = "## main...origin/main"
+		let result = parse_git_status(output)
+		assert_equal(result["branch"], "main")
+		assert_equal(result["upstream"], "origin/main")
+		assert_equal(result["is_clean"], 1)
+	}
+
+	test "clean repo ahead of remote" {
+		let output = "## main...origin/main [ahead 3]"
+		let result = parse_git_status(output)
+		assert_equal(result["branch"], "main")
+		assert_equal(result["upstream"], "origin/main")
+		assert_equal(result["ahead_count"], 3)
+		assert_equal(result["behind_count"], 0)
+	}
+
+	test "clean repo behind remote" {
+		let output = "## main...origin/main [behind 5]"
+		let result = parse_git_status(output)
+		assert_equal(result["branch"], "main")
+		assert_equal(result["behind_count"], 5)
+		assert_equal(result["ahead_count"], 0)
+	}
+
+	test "clean repo ahead and behind (diverged)" {
+		let output = "## main...origin/main [ahead 2, behind 3]"
+		let result = parse_git_status(output)
+		assert_equal(result["branch"], "main")
+		assert_equal(result["ahead_count"], 2)
+		assert_equal(result["behind_count"], 3)
+	}
+
+	test "initial commit state" {
+		let output = "## Initial commit on main"
+		let result = parse_git_status(output)
+		assert_equal(result["branch"], "main")
+		assert_equal(result["is_clean"], 1)
+	}
+}
+
+test_group "parse_git_status — Dirty Repo" {
+	test "modified file (unstaged)" {
+		let output = "## main\n M README.md"
+		let result = parse_git_status(output)
+		assert_equal(result["branch"], "main")
+		assert_equal(result["is_clean"], 0)
+		assert_equal(result["changed_total"], 1)
+		assert_equal(result["unstaged_count"], 1)
+		assert_equal(result["staged_count"], 0)
+	}
+
+	test "modified file (staged)" {
+		let output = "## main\nM  README.md"
+		let result = parse_git_status(output)
+		assert_equal(result["branch"], "main")
+		assert_equal(result["is_clean"], 0)
+		assert_equal(result["changed_total"], 1)
+		assert_equal(result["staged_count"], 1)
+		assert_equal(result["unstaged_count"], 0)
+	}
+
+	test "added file (staged)" {
+		let output = "## main\nA  newfile.txt"
+		let result = parse_git_status(output)
+		assert_equal(result["is_clean"], 0)
+		assert_equal(result["staged_count"], 1)
+	}
+
+	test "deleted file (staged)" {
+		let output = "## main\nD  oldfile.txt"
+		let result = parse_git_status(output)
+		assert_equal(result["is_clean"], 0)
+		assert_equal(result["staged_count"], 1)
+	}
+
+	test "untracked file" {
+		let output = "## main\n?? untracked.txt"
+		let result = parse_git_status(output)
+		assert_equal(result["is_clean"], 0)
+		assert_equal(result["untracked_count"], 1)
+		assert_equal(result["changed_total"], 1)
+	}
+
+	test "multiple file changes" {
+		let output = "## main\nM  staged.txt\n M unstaged.txt\n?? new.txt\nA  added.txt"
+		let result = parse_git_status(output)
+		assert_equal(result["is_clean"], 0)
+		assert_equal(result["changed_total"], 4)
+	}
+
+	test "file changes are captured in list" {
+		let output = "## main\n M modified.txt\n?? untracked.txt"
+		let result = parse_git_status(output)
+		let changes = result["file_changes"]
+		assert_equal(len(changes), 2)
+	}
+
+	test "rename detected" {
+		let output = "## main\nR  old.txt -> new.txt"
+		let result = parse_git_status(output)
+		assert_equal(result["is_clean"], 0)
+		assert_equal(result["changed_total"], 1)
+	}
+}
+
+test_group "parse_git_status — Edge Cases" {
+	test "empty output" {
+		let output = ""
+		let result = parse_git_status(output)
+		assert_equal(result["branch"], "")
+		assert_equal(result["is_clean"], 1)
+	}
+
+	test "only newlines" {
+		let output = "\n\n"
+		let result = parse_git_status(output)
+		assert_equal(result["is_clean"], 1)
+	}
+
+	test "branch with no remote and trailing newline" {
+		let output = "## feature/branch\n"
+		let result = parse_git_status(output)
+		assert_equal(result["branch"], "feature/branch")
+		assert_equal(result["is_clean"], 1)
+	}
+}
+
+// === validate_repo_path Tests ===
+
+test_group "validate_repo_path" {
+	test "null returned for valid existing directory" {
+		let result = validate_repo_path("/Users")
+		assert_equal(result, null)
+	}
+
+	test "error returned for non-existent path" {
+		let result = validate_repo_path("/nonexistent/path/12345")
+		assert_true(result != null)
+	}
+
+	test "error message contains path" {
+		let result = validate_repo_path("/nonexistent/path/xyz")
+		assert_true(contains(result, "exist") == 1 || contains(result, "not") == 1)
+	}
+}

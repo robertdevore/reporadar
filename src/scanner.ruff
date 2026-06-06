@@ -1,0 +1,497 @@
+// scanner.ruff — RepoRadar Git Scanner
+// Runs safe read-only Git commands and parses their output.
+
+/// validate_git_repo checks if a path is a valid Git repository.
+/// Returns true if it's a valid git repo, false otherwise.
+export func validate_git_repo(path) {
+	mut result = execute_status("git -C " + path + " rev-parse --is-inside-work-tree 2>/dev/null")
+	if result.success && result.exitcode == 0 {
+		mut stdout = trim(result.stdout)
+		if stdout == "true" {
+			return true
+		}
+	}
+	return false
+}
+
+/// validate_repo_path checks if a path exists and is a directory.
+/// Returns an error string or null on success.
+export func validate_repo_path(path) {
+	if !file_exists(path) {
+		return "Path does not exist: " + path
+	}
+	if !path_is_dir(path) {
+		return "Path is not a directory: " + path
+	}
+	return null
+}
+
+/// get_canonical_path returns the git repo root (top-level) path.
+export func get_canonical_path(repo_path) {
+	mut result = execute_status("git -C " + repo_path + " rev-parse --show-toplevel 2>/dev/null")
+	if result.success && result.exitcode == 0 {
+		return trim(result.stdout)
+	}
+	return repo_path
+}
+
+/// get_current_branch returns the current branch name.
+/// Returns empty string if detached HEAD.
+export func get_current_branch(repo_path) {
+	mut result = execute_status("git -C " + repo_path + " branch --show-current 2>/dev/null")
+	if result.success && result.exitcode == 0 {
+		return trim(result.stdout)
+	}
+	return ""
+}
+
+/// parse_git_status parses the output of `git status --porcelain=v1 --branch`.
+/// Returns a dict with parsed status information.
+export func parse_git_status(output) {
+	mut lines = split(output, "\n")
+	mut result = {
+		"branch": "",
+		"upstream": "",
+		"ahead_count": 0,
+		"behind_count": 0,
+		"is_detached": 0,
+		"staged_count": 0,
+		"unstaged_count": 0,
+		"untracked_count": 0,
+		"changed_total": 0,
+		"is_clean": 1,
+		"file_changes": []
+	}
+
+	mut i = 0
+	while i < len(lines) {
+		mut line = lines[i]
+		i = i + 1
+
+		if line == "" {
+			continue
+		}
+
+		// Branch header line: ## branch...upstream [ahead N, behind M]
+		if starts_with(line, "## ") == 1 {
+			mut header = substring(line, 3, len(line))
+
+			// Check for initial commit state
+			if contains(header, "Initial commit on ") == 1 {
+				mut branch = replace_str(header, "Initial commit on ", "")
+				result["branch"] = branch
+				continue
+			}
+
+			// Parse branch and upstream
+			if contains(header, "...") == 1 {
+				// Has upstream
+				mut parts = split(header, "...")
+				if len(parts) > 0 {
+					result["branch"] = parts[0]
+				}
+				if len(parts) > 1 {
+					mut upstream_part = parts[1]
+					// Extract ahead/behind from upstream part
+					if contains(upstream_part, " [") == 1 {
+						mut bracket_start = index_of(upstream_part, " [")
+						if bracket_start >= 0 {
+							result["upstream"] = substring(upstream_part, 0, bracket_start)
+							mut bracket_content = substring(upstream_part, bracket_start + 2, len(upstream_part) - 1)
+							// Parse ahead/behind
+							if contains(bracket_content, "ahead ") == 1 {
+								mut ahead_start = index_of(bracket_content, "ahead ") + 6
+								mut ahead_str = ""
+								mut j = ahead_start
+								while j < len(bracket_content) {
+									mut ch = char_at(bracket_content, j)
+									if ch >= "0" && ch <= "9" {
+										ahead_str = ahead_str + ch
+									} else {
+										break
+									}
+									j = j + 1
+								}
+								if ahead_str != "" {
+									result["ahead_count"] = parse_int(ahead_str)
+								}
+							}
+							if contains(bracket_content, "behind ") == 1 {
+								mut behind_start = index_of(bracket_content, "behind ") + 7
+								mut behind_str = ""
+								mut k = behind_start
+								while k < len(bracket_content) {
+									mut c = char_at(bracket_content, k)
+									if c >= "0" && c <= "9" {
+										behind_str = behind_str + c
+									} else {
+										break
+									}
+									k = k + 1
+								}
+								if behind_str != "" {
+									result["behind_count"] = parse_int(behind_str)
+								}
+							}
+						}
+					} else {
+						result["upstream"] = upstream_part
+					}
+				}
+			} else {
+				// No upstream
+				result["branch"] = header
+			}
+			continue
+		}
+
+		// File status lines: XY filename
+		if len(line) >= 3 {
+			mut status_code = substring(line, 0, 2)
+			mut filename = trim(substring(line, 3, len(line)))
+
+			// Handle rename (first line may show old -> new)
+			if starts_with(status_code, "R") == 1 {
+				// Renamed file
+				result["unstaged_count"] = result["unstaged_count"] + 1
+				result["changed_total"] = result["changed_total"] + 1
+				result["is_clean"] = 0
+				mut change = {
+					"status_code": status_code,
+					"file_path": filename,
+					"status_label": "renamed",
+					"staged": 0,
+					"unstaged": 1,
+					"untracked": 0
+				}
+				result["file_changes"] = push(result["file_changes"], change)
+				continue
+			}
+
+			// Parse index and worktree status
+			mut index_status = char_at(status_code, 0)
+			mut worktree_status = char_at(status_code, 1)
+
+mut staged = 0
+				mut unstaged = 0
+				mut untracked = 0
+				mut label = ""
+
+			// Index (staging area) status
+			if index_status != " " && index_status != "?" {
+				staged = 1
+				result["staged_count"] = result["staged_count"] + 1
+			}
+
+			// Worktree status
+			if worktree_status != " " {
+				if worktree_status == "?" {
+					untracked = 1
+					result["untracked_count"] = result["untracked_count"] + 1
+				} else {
+					unstaged = 1
+					result["unstaged_count"] = result["unstaged_count"] + 1
+				}
+			}
+
+			if staged == 1 || unstaged == 1 || untracked == 1 {
+				result["changed_total"] = result["changed_total"] + 1
+				result["is_clean"] = 0
+			}
+
+			// Determine label
+			if index_status == "M" && (worktree_status == " " || worktree_status == "M") {
+				label = "modified"
+			} else if index_status == "A" {
+				label = "added"
+			} else if index_status == "D" {
+				label = "deleted"
+			} else if index_status == "R" {
+				label = "renamed"
+			} else if worktree_status == "M" {
+				label = "modified"
+			} else if worktree_status == "D" {
+				label = "deleted"
+			} else if worktree_status == "?" {
+				label = "untracked"
+			} else {
+				label = "changed"
+			}
+
+			mut change = {
+				"status_code": status_code,
+				"file_path": filename,
+				"status_label": label,
+				"staged": staged,
+				"unstaged": unstaged,
+				"untracked": untracked
+			}
+			result["file_changes"] = push(result["file_changes"], change)
+		}
+	}
+
+	return result
+}
+
+/// get_latest_commit returns the latest commit info as a dict.
+/// Uses null-safe parsing.
+export func get_latest_commit(repo_path) {
+	mut result = execute_status("git -C " + repo_path + " log -1 --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null")
+	if !result.success || result.exitcode != 0 {
+		return {
+			"hash": "",
+			"short_hash": "",
+			"author": "",
+			"date": "",
+			"message": ""
+		}
+	}
+
+	mut output = trim(result.stdout)
+	if output == "" {
+		return {
+			"hash": "",
+			"short_hash": "",
+			"author": "",
+			"date": "",
+			"message": ""
+		}
+	}
+
+	// Split by separator
+	mut parts = split(output, "---")
+	mut commit = {
+		"hash": "",
+		"short_hash": "",
+		"author": "",
+		"date": "",
+		"message": ""
+	}
+
+	if len(parts) > 0 { commit["hash"] = parts[0] }
+	if len(parts) > 1 { commit["short_hash"] = parts[1] }
+	if len(parts) > 2 { commit["author"] = parts[2] }
+	if len(parts) > 3 { commit["date"] = parts[3] }
+	if len(parts) > 4 { commit["message"] = parts[4] }
+
+	return commit
+}
+
+/// get_remote_url returns the origin remote URL, or empty string if none.
+export func get_remote_url(repo_path) {
+	mut result = execute_status("git -C " + repo_path + " remote get-url origin 2>/dev/null")
+	if result.success && result.exitcode == 0 {
+		return trim(result.stdout)
+	}
+	return ""
+}
+
+/// get_upstream_info returns the upstream branch name and ahead/behind counts.
+export func get_upstream_info(repo_path) {
+	mut info = {
+		"upstream_branch": "",
+		"ahead_count": 0,
+		"behind_count": 0
+	}
+
+	// Get upstream branch name
+	mut upstream_result = execute_status("git -C " + repo_path + " rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null")
+	if upstream_result.success && upstream_result.exitcode == 0 {
+		info["upstream_branch"] = trim(upstream_result.stdout)
+	}
+
+	// Get ahead/behind counts (alternative to status parsing)
+	if info["upstream_branch"] != "" {
+		mut count_result = execute_status("git -C " + repo_path + " rev-list --left-right --count HEAD...@{u} 2>/dev/null")
+		if count_result.success && count_result.exitcode == 0 {
+			mut counts = trim(count_result.stdout)
+			mut parts = split(counts, "\t")
+
+			// Handle new format (tab-separated)
+			if contains(counts, "\t") == 1 && len(parts) == 2 {
+				info["ahead_count"] = parse_int(trim(parts[0]))
+				info["behind_count"] = parse_int(trim(parts[1]))
+			} else {
+				// Handle old format (space-separated)
+				if contains(counts, " ") == 1 {
+					mut space_parts = split(counts, " ")
+					if len(space_parts) == 2 {
+						info["ahead_count"] = parse_int(trim(space_parts[0]))
+						info["behind_count"] = parse_int(trim(space_parts[1]))
+					}
+				}
+			}
+		}
+	}
+
+	return info
+}
+
+/// scan_repo performs a full scan of a single git repository.
+/// Returns a dict with scan results and any error message.
+export func scan_repo(repo_path) {
+	mut result = {
+		"success": true,
+		"error": "",
+		"canonical_path": "",
+		"branch": "",
+		"remote_url": "",
+		"upstream_branch": "",
+		"latest_commit_hash": "",
+		"latest_commit_short_hash": "",
+		"latest_commit_message": "",
+		"latest_commit_author": "",
+		"latest_commit_date": "",
+		"is_clean": 1,
+		"staged_count": 0,
+		"unstaged_count": 0,
+		"untracked_count": 0,
+		"changed_total": 0,
+		"ahead_count": 0,
+		"behind_count": 0,
+		"is_diverged": 0,
+		"is_detached": 0,
+		"has_remote": 0,
+		"file_changes": []
+	}
+
+	// Validate repo first
+	if !validate_git_repo(repo_path) {
+		result["success"] = false
+		result["error"] = "Not a valid Git repository: " + repo_path
+		return result
+	}
+
+	// Get canonical path
+	result["canonical_path"] = get_canonical_path(repo_path)
+
+	// Get branch and status via porcelain
+	mut status_output = ""
+	try {
+		mut status_result = execute_status("git -C " + repo_path + " status --porcelain=v1 --branch 2>/dev/null")
+		if status_result.success && status_result.exitcode == 0 {
+			status_output = status_result.stdout
+		} else {
+			result["success"] = false
+			result["error"] = "Failed to get git status: " + status_result.stderr
+			return result
+		}
+	} except err {
+		result["success"] = false
+		result["error"] = "Command execution failed for git status"
+		return result
+	}
+
+	mut status_data = parse_git_status(status_output)
+
+	result["branch"] = status_data["branch"]
+	result["is_clean"] = status_data["is_clean"]
+	result["staged_count"] = status_data["staged_count"]
+	result["unstaged_count"] = status_data["unstaged_count"]
+	result["untracked_count"] = status_data["untracked_count"]
+	result["changed_total"] = status_data["changed_total"]
+	result["file_changes"] = status_data["file_changes"]
+
+	// Check for detached HEAD
+	if result["branch"] == "" || starts_with(result["branch"], "HEAD detached") == 1 {
+		result["is_detached"] = 1
+		// Try to get branch info via rev-parse
+		mut head_result = execute_status("git -C " + repo_path + " rev-parse --abbrev-ref HEAD 2>/dev/null")
+		if head_result.success && head_result.exitcode == 0 {
+			mut head_ref = trim(head_result.stdout)
+			if head_ref == "HEAD" {
+				// Truly detached - use commit hash as branch
+				mut commit = get_latest_commit(repo_path)
+				result["branch"] = "(detached at " + commit["short_hash"] + ")"
+			} else {
+				result["branch"] = head_ref
+				result["is_detached"] = 0
+			}
+		}
+	}
+
+	// Use upstream info from status parsing first
+	if contains(status_output, "...") == 1 {
+		result["upstream_branch"] = status_data["upstream"]
+		result["ahead_count"] = status_data["ahead_count"]
+		result["behind_count"] = status_data["behind_count"]
+	}
+
+	// Get remote URL
+	result["remote_url"] = get_remote_url(repo_path)
+	if result["remote_url"] != "" {
+		result["has_remote"] = 1
+	}
+
+	// If upstream wasn't found via status parsing, try explicit command
+	if result["upstream_branch"] == "" && result["has_remote"] == 1 {
+		mut upstream_info = get_upstream_info(repo_path)
+		if upstream_info["upstream_branch"] != "" {
+			result["upstream_branch"] = upstream_info["upstream_branch"]
+			result["ahead_count"] = upstream_info["ahead_count"]
+			result["behind_count"] = upstream_info["behind_count"]
+		}
+	}
+
+	// Determine diverged state
+	if result["ahead_count"] > 0 && result["behind_count"] > 0 {
+		result["is_diverged"] = 1
+	}
+
+	// Get latest commit
+	mut commit = get_latest_commit(repo_path)
+	result["latest_commit_hash"] = commit["hash"]
+	result["latest_commit_short_hash"] = commit["short_hash"]
+	result["latest_commit_author"] = commit["author"]
+	result["latest_commit_date"] = commit["date"]
+	result["latest_commit_message"] = commit["message"]
+
+	return result
+}
+
+/// collect_recent_commits fetches recent commits from a repo.
+/// days: number of days to look back (or 0 for last 20 commits).
+export func collect_recent_commits(repo_path, days) {
+	mut commits = []
+	mut command = ""
+
+	if days > 0 {
+		command = "git -C " + repo_path + " log --since=\"" + to_string(days) + " days ago\" --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null"
+	} else {
+		command = "git -C " + repo_path + " log -20 --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null"
+	}
+
+	mut result = execute_status(command)
+	if !result.success || result.exitcode != 0 {
+		return commits
+	}
+
+	mut output = trim(result.stdout)
+	if output == "" {
+		return commits
+	}
+
+	mut lines = split(output, "\n")
+	mut i = 0
+	while i < len(lines) {
+		mut line = lines[i]
+		i = i + 1
+		if line == "" {
+			continue
+		}
+
+		mut parts = split(line, "---")
+		if len(parts) >= 5 {
+			mut commit = {
+				"hash": parts[0],
+				"short_hash": parts[1],
+				"author": parts[2],
+				"date": parts[3],
+				"message": parts[4]
+			}
+			commits = push(commits, commit)
+		}
+	}
+
+	return commits
+}

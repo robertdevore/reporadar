@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Discover Repos — RepoRadar</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+.discovery-container { max-width: 800px; margin: 0 auto; }
+.result-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+.result-list { margin-top: 12px; }
+.result-item { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+.result-checkbox { width: 18px; height: 18px; }
+.result-name { font-weight: 500; }
+.result-path { font-size: 12px; color: var(--text-muted); font-family: monospace; }
+.select-all-row { padding: 8px 0; border-bottom: 1px solid var(--border-color); margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div id="app" style="max-width:1000px;margin:0 auto;padding:0 24px 48px;">
+  <header class="header">
+    <div class="header-left">
+      <h1 class="logo">🔭 RepoRadar</h1>
+      <span class="version">v0.1.0</span>
+    </div>
+    <div class="header-right">
+      <a href="/" class="btn btn-ghost">← Dashboard</a>
+    </div>
+  </header>
+
+  <div class="nav-back"><a href="/">← Back to Dashboard</a></div>
+
+  <div class="discovery-container">
+    <div class="card" style="margin-bottom:20px;">
+      <h3>🔍 Discover Git Repositories</h3>
+      <p style="color:var(--text-muted);margin-bottom:12px;">Enter a parent directory to recursively find all Git repos.</p>
+      <div class="form-group">
+        <label for="discover-path">Parent Directory</label>
+        <input type="text" id="discover-path" placeholder="/Users/me/projects" value="">
+      </div>
+      <div style="display:flex;gap:12px;margin-top:8px;">
+        <button class="btn btn-primary" id="btn-discover-start">🔍 Scan Directory</button>
+        <button class="btn btn-secondary" id="btn-add-selected" style="display:none;">+ Add Selected Repos</button>
+      </div>
+    </div>
+
+    <div id="discover-results" class="hidden">
+      <div class="result-card">
+        <h3 id="result-title">Results</h3>
+        <div class="select-all-row" id="select-all-row" style="display:none;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="select-all" class="result-checkbox" onchange="toggleSelectAll()">
+            <span>Select All</span>
+          </label>
+        </div>
+        <div class="result-list" id="result-list"></div>
+      </div>
+    </div>
+
+    <div id="discover-loading" class="loading-state hidden">
+      <div class="spinner"></div>
+      <p>Scanning directory for Git repos...</p>
+    </div>
+  </div>
+</div>
+<script src="/discovery.js"></script>
+</body>
+</html>

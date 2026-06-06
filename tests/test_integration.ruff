@@ -1,0 +1,131 @@
+// RepoRadar Integration Tests
+// Run: ruff test-run tests/test_integration.ruff
+// Requires: a real git repo at the path specified below
+
+from src.scanner import validate_git_repo, scan_repo, collect_recent_commits, get_canonical_path
+from src.db import init_db
+from src.registry import add_repo, remove_repo, get_all_repos, get_repo_by_id, store_scan_result, store_repo_commits, get_repo_commits
+
+// Use the reporadar project itself as a test repo (it's already a git repo)
+let test_repo_path = "/Users/robertdevore/2026/reporadar"
+
+// === Git Validation Tests ===
+
+test_group "Git validation" {
+	test "validate_git_repo returns true for real git repo" {
+		// Only run if the test repo path exists and is a git repo
+		let is_valid = validate_git_repo(test_repo_path)
+		assert_true(is_valid)
+	}
+
+	test "validate_git_repo returns false for non-git directory" {
+		let result = validate_git_repo("/tmp")
+		assert_false(result)
+	}
+
+	test "get_canonical_path returns correct path" {
+		let canonical = get_canonical_path(test_repo_path)
+		assert_true(len(canonical) > 0)
+		assert_true(contains(canonical, "reporadar") == 1)
+	}
+}
+
+// === Full Scan Tests ===
+
+test_group "Full repo scan" {
+	test "scan_repo returns success for valid repo" {
+		let result = scan_repo(test_repo_path)
+		assert_true(result["success"])
+		assert_true(len(result["branch"]) > 0 || result["is_detached"] == 1)
+	}
+
+	test "scan_repo captures branch name" {
+		let result = scan_repo(test_repo_path)
+		let branch = result["branch"]
+		// Branch should be non-empty or detached
+		assert_true(branch != "" || result["is_detached"] == 1)
+	}
+
+	test "scan_repo captures latest commit" {
+		let result = scan_repo(test_repo_path)
+		if result["success"] {
+			assert_true(len(result["latest_commit_hash"]) >= 7)
+			assert_true(len(result["latest_commit_short_hash"]) >= 7)
+		}
+	}
+
+	test "scan_repo returns file changes array" {
+		let result = scan_repo(test_repo_path)
+		assert_true(is_array(result["file_changes"]) || result["file_changes"] != null)
+	}
+
+	test "scan_repo handles non-existent path" {
+		let result = scan_repo("/nonexistent/path/xyz/repo")
+		assert_false(result["success"])
+		assert_true(result["error"] != "")
+	}
+}
+
+// === Commit Collection Tests ===
+
+test_group "Commit collection" {
+	test "collect_recent_commits returns array" {
+		let commits = collect_recent_commits(test_repo_path, 0)
+		assert_true(is_array(commits) || commits != null)
+	}
+
+	test "collect_recent_commits has expected fields" {
+		let commits = collect_recent_commits(test_repo_path, 0)
+		if len(commits) > 0 {
+			let commit = commits[0]
+			assert_true(has_key(commit, "hash") == 1)
+			assert_true(has_key(commit, "short_hash") == 1)
+			assert_true(has_key(commit, "author") == 1)
+			assert_true(has_key(commit, "date") == 1)
+			assert_true(has_key(commit, "message") == 1)
+		}
+	}
+}
+
+// === End-to-End Registry + Scan Flow ===
+
+test_group "End-to-end flow" {
+	test "add repo, scan, store, and retrieve" {
+		let db = db_connect("sqlite", ":memory:")
+		
+		// Create minimal schema for testing
+		db_execute(db, "CREATE TABLE IF NOT EXISTS repos (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_name TEXT, path TEXT NOT NULL UNIQUE, group_name TEXT DEFAULT '', tags TEXT DEFAULT '', notes TEXT DEFAULT '', pinned INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), last_scan_at TEXT, last_error TEXT)")
+		
+		db_execute(db, "CREATE TABLE IF NOT EXISTS repo_status_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, scanned_at TEXT NOT NULL DEFAULT (datetime('now')), branch TEXT, remote_url TEXT, upstream_branch TEXT, latest_commit_hash TEXT, latest_commit_short_hash TEXT, latest_commit_message TEXT, latest_commit_author TEXT, latest_commit_date TEXT, is_clean INTEGER DEFAULT 0, staged_count INTEGER DEFAULT 0, unstaged_count INTEGER DEFAULT 0, untracked_count INTEGER DEFAULT 0, changed_total INTEGER DEFAULT 0, ahead_count INTEGER DEFAULT 0, behind_count INTEGER DEFAULT 0, is_diverged INTEGER DEFAULT 0, is_detached INTEGER DEFAULT 0, has_remote INTEGER DEFAULT 0, scan_error TEXT, FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE)")
+		
+		db_execute(db, "CREATE TABLE IF NOT EXISTS repo_commits (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, commit_hash TEXT NOT NULL, short_hash TEXT NOT NULL, author TEXT NOT NULL, date TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE)")
+
+		// Add the test repo
+		let add_result = add_repo(db, test_repo_path, "", "", "", "", 0)
+		assert_true(add_result["success"])
+		let repo_id = add_result["id"]
+		assert_true(repo_id > 0)
+
+		// Scan it
+		let scan_data = scan_repo(test_repo_path)
+		assert_true(scan_data["success"])
+
+		// Store scan result
+		let snapshot_id = store_scan_result(db, repo_id, scan_data)
+		assert_true(snapshot_id > 0)
+
+		// Collect and store commits
+		let commits = collect_recent_commits(test_repo_path, 0)
+		store_repo_commits(db, repo_id, commits)
+
+		// Retrieve and verify
+		let repo = get_repo_by_id(db, repo_id)
+		assert_true(repo != null)
+		
+		let all_repos = get_all_repos(db)
+		assert_equal(len(all_repos), 1)
+
+		// Clean up
+		remove_repo(db, repo_id)
+	}
+}

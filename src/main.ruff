@@ -1,0 +1,267 @@
+// main.ruff — RepoRadar CLI Entry Point
+// Usage: ruff run src/main.ruff [command]
+
+from src.server import start_server, discover_repos
+from src.scanner import scan_repo, collect_recent_commits
+from src.registry import add_repo, remove_repo, get_all_repos, get_repo_by_id, store_scan_result, store_repo_commits
+from src.db import init_db, get_setting
+
+/// print_usage displays the help text.
+export func print_usage() {
+	print("RepoRadar v0.1.0 — Local Git Repository Dashboard")
+	print("")
+	print("Usage: ruff run src/main.ruff [command] [options]")
+	print("")
+	print("Commands:")
+	print("  serve [port]        Start the dashboard server (default port: 8080)")
+	print("  scan <repo-id>      Scan a single tracked repo by ID")
+	print("  scan-all            Scan all tracked repos")
+	print("  add <path>          Add a repo by path")
+	print("  remove <repo-id>    Remove a repo from tracking")
+	print("  list                List all tracked repos")
+	print("  discover <path>     Discover Git repos under a directory")
+	print("  export              Export registry to JSON")
+	print("  help                Show this help")
+	print("")
+	print("Examples:")
+	print("  ruff run src/main.ruff serve 8080")
+	print("  ruff run src/main.ruff add /Users/me/my-project")
+	print("  ruff run src/main.ruff scan 1")
+	print("  ruff run src/main.ruff scan-all")
+	print("  ruff run src/main.ruff list")
+}
+
+/// cmd_list prints all tracked repos.
+export func cmd_list() {
+	mut db = init_db()
+	mut repos = get_all_repos(db)
+	print("")
+	print("=== Tracked Repositories (" + to_string(len(repos)) + ") ===")
+	print("")
+	mut i = 0
+	while i < len(repos) {
+		mut repo = repos[i]
+		i = i + 1
+		mut status = "?"
+		if has_key(repo, "is_clean") == 1 {
+			if repo["is_clean"] == 1 { status = "Clean" } else { status = "Dirty" }
+		}
+		if has_key(repo, "scan_error") == 1 && repo["scan_error"] != null && repo["scan_error"] != "" {
+			status = "Error"
+		}
+		mut name = get_default(repo, "display_name", get_default(repo, "name", "?"))
+		print("  [" + to_string(repo["id"]) + "] " + name + " — " + status)
+		print("      " + repo["path"])
+	}
+	print("")
+}
+
+/// cmd_add adds a repo by path.
+export func cmd_add(path) {
+	if path == "" {
+		print("Error: path is required")
+		return
+	}
+	mut db = init_db()
+	mut result = add_repo(db, path, "", "", "", "", 0)
+	if result["success"] {
+		print("Added repo: " + result["path"] + " (ID: " + to_string(result["id"]) + ")")
+	} else {
+		print("Error: " + result["error"])
+	}
+}
+
+/// cmd_remove removes a repo from tracking.
+export func cmd_remove(repo_id_str) {
+	if repo_id_str == "" {
+		print("Error: repo ID is required")
+		return
+	}
+	mut db = init_db()
+	mut repo_id = parse_int(repo_id_str)
+	mut result = remove_repo(db, repo_id)
+	if result["success"] {
+		print("Repo " + repo_id_str + " removed from tracking.")
+	} else {
+		print("Error: " + result["error"])
+	}
+}
+
+/// cmd_scan scans a single repo.
+export func cmd_scan(repo_id_str) {
+	if repo_id_str == "" {
+		print("Error: repo ID is required")
+		return
+	}
+	mut db = init_db()
+	mut repo_id = parse_int(repo_id_str)
+	mut repo = get_repo_by_id(db, repo_id)
+	if repo == null {
+		print("Error: repo not found")
+		return
+	}
+
+	print("Scanning: " + repo["path"] + " ...")
+	mut scan_result = scan_repo(repo["path"])
+	store_scan_result(db, repo_id, scan_result)
+
+	if scan_result["success"] {
+		print("Branch: " + scan_result["branch"])
+		if scan_result["is_clean"] == 1 {
+			print("Status: Clean")
+		} else {
+			print("Status: Dirty (" + to_string(scan_result["changed_total"]) + " changed files)")
+		}
+		if scan_result["has_remote"] == 1 {
+			print("Remote: " + scan_result["remote_url"])
+			print("Ahead: " + to_string(scan_result["ahead_count"]) + " | Behind: " + to_string(scan_result["behind_count"]))
+		}
+		if scan_result["latest_commit_message"] != "" {
+			print("Latest: " + scan_result["latest_commit_message"])
+		}
+	} else {
+		print("Error: " + scan_result["error"])
+	}
+}
+
+/// cmd_scan_all scans all tracked repos.
+export func cmd_scan_all() {
+	mut db = init_db()
+	mut repos = get_all_repos(db)
+	print("Scanning " + to_string(len(repos)) + " repos...")
+
+	mut success = 0
+	mut errors = 0
+	mut i = 0
+	while i < len(repos) {
+		mut repo = repos[i]
+		i = i + 1
+		print("  [" + to_string(i) + "/" + to_string(len(repos)) + "] " + repo["name"] + " ...")
+		mut scan_result = scan_repo(repo["path"])
+		store_scan_result(db, repo["id"], scan_result)
+
+		if scan_result["success"] {
+			success = success + 1
+			mut commits = collect_recent_commits(repo["path"], 0)
+			store_repo_commits(db, repo["id"], commits)
+		} else {
+			errors = errors + 1
+			print("    Error: " + scan_result["error"])
+		}
+	}
+
+	print("")
+	print("Done. " + to_string(success) + " succeeded, " + to_string(errors) + " errors.")
+}
+
+/// cmd_discover finds Git repos under a parent directory.
+export func cmd_discover(parent_path) {
+	if parent_path == "" {
+		print("Error: parent path is required")
+		return
+	}
+	mut db = init_db()
+	mut ignored_str = get_setting(db, "ignored_folders", "node_modules,vendor,.cache,dist,build,.git")
+	mut ignored_folders = split(ignored_str, ",")
+	mut discovered = discover_repos(parent_path, 3, 0, ignored_folders)
+	print("")
+	print("=== Discovered " + to_string(len(discovered)) + " Git repos under " + parent_path + " ===")
+	print("")
+	mut di = 0
+	while di < len(discovered) {
+		print("  " + discovered[di]["name"] + " — " + discovered[di]["path"])
+		di = di + 1
+	}
+	print("")
+}
+
+/// cmd_export exports the registry to JSON.
+export func cmd_export() {
+	mut db = init_db()
+	mut repos = get_all_repos(db)
+	mut settings_rows = db_query(db, "SELECT key, value FROM settings")
+	mut settings = {}
+	mut i = 0
+	while i < len(settings_rows) {
+		settings[settings_rows[i]["key"]] = settings_rows[i]["value"]
+		i = i + 1
+	}
+
+	mut export_data = {
+		"app": "reporadar",
+		"version": "0.1.0",
+		"settings": settings,
+		"repos": repos
+	}
+
+	mut json_str = to_json_pretty(export_data)
+	write_file("reporadar-export.json", json_str, {"overwrite": true})
+	print("Exported " + to_string(len(repos)) + " repos to reporadar-export.json")
+}
+
+/// main is the CLI entry point.
+export func main() {
+	mut argv = args()
+	mut cmd = "serve"
+	mut cmd_arg = "8080"
+
+	if len(argv) > 0 {
+		cmd = argv[0]
+	}
+	if len(argv) > 1 {
+		cmd_arg = argv[1]
+	}
+
+	if cmd == "help" || cmd == "--help" || cmd == "-h" {
+		print_usage()
+		return
+	}
+
+	if cmd == "serve" {
+		mut port = parse_int(cmd_arg)
+		start_server(port)
+		return
+	}
+
+	if cmd == "list" {
+		cmd_list()
+		return
+	}
+
+	if cmd == "add" {
+		cmd_add(cmd_arg)
+		return
+	}
+
+	if cmd == "remove" {
+		cmd_remove(cmd_arg)
+		return
+	}
+
+	if cmd == "scan" {
+		cmd_scan(cmd_arg)
+		return
+	}
+
+	if cmd == "scan-all" {
+		cmd_scan_all()
+		return
+	}
+
+	if cmd == "discover" {
+		cmd_discover(cmd_arg)
+		return
+	}
+
+	if cmd == "export" {
+		cmd_export()
+		return
+	}
+
+	// Unknown command
+	print("Unknown command: " + cmd)
+	print_usage()
+}
+
+// Run main
+main()

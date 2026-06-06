@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RepoRadar — Local Git Command Center</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="app">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <h1 class="logo">🔭 RepoRadar</h1>
+      <span class="version">v0.1.0</span>
+    </div>
+    <div class="header-right">
+      <button id="btn-scan-all" class="btn btn-primary">⚡ Scan All</button>
+      <button id="btn-add-repo" class="btn btn-secondary">+ Add Repo</button>
+      <button id="btn-discover" class="btn btn-secondary">🔍 Discover</button>
+      <a href="/settings.html" class="btn btn-ghost">⚙ Settings</a>
+    </div>
+  </header>
+
+  <!-- Summary Bar -->
+  <div id="summary-bar" class="summary-bar">
+    <div class="summary-card"><span class="summary-label">Total</span><span class="summary-value" id="sum-total">-</span></div>
+    <div class="summary-card clean"><span class="summary-label">Clean</span><span class="summary-value" id="sum-clean">-</span></div>
+    <div class="summary-card dirty"><span class="summary-label">Dirty</span><span class="summary-value" id="sum-dirty">-</span></div>
+    <div class="summary-card ahead"><span class="summary-label">Ahead</span><span class="summary-value" id="sum-ahead">-</span></div>
+    <div class="summary-card behind"><span class="summary-label">Behind</span><span class="summary-value" id="sum-behind">-</span></div>
+    <div class="summary-card diverged"><span class="summary-label">Diverged</span><span class="summary-value" id="sum-diverged">-</span></div>
+    <div class="summary-card no-remote"><span class="summary-label">No Remote</span><span class="summary-value" id="sum-noremote">-</span></div>
+    <div class="summary-card error"><span class="summary-label">Errors</span><span class="summary-value" id="sum-errors">-</span></div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="controls-left">
+      <input type="text" id="search-input" class="search-input" placeholder="Search repos... (name, path, group, tag, branch, commit message)">
+      <select id="filter-status" class="filter-select">
+        <option value="all">All Repos</option>
+        <option value="clean">Clean</option>
+        <option value="dirty">Dirty</option>
+        <option value="staged">Staged Changes</option>
+        <option value="unstaged">Unstaged Changes</option>
+        <option value="untracked">Untracked Files</option>
+        <option value="ahead">Ahead of Remote</option>
+        <option value="behind">Behind Remote</option>
+        <option value="diverged">Diverged</option>
+        <option value="no-remote">No Remote</option>
+        <option value="error">Errors</option>
+        <option value="stale">Stale</option>
+      </select>
+      <select id="filter-group" class="filter-select">
+        <option value="">All Groups</option>
+      </select>
+    </div>
+    <div class="controls-right">
+      <span id="scan-status" class="scan-status"></span>
+      <span id="progress-text" class="progress-text"></span>
+    </div>
+  </div>
+
+  <!-- Main Table -->
+  <div class="table-container">
+    <table id="repo-table" class="repo-table">
+      <thead>
+        <tr>
+          <th class="sortable" data-sort="status">Status</th>
+          <th class="sortable" data-sort="name">Repo Name</th>
+          <th class="sortable" data-sort="group_name">Group</th>
+          <th class="sortable" data-sort="tags">Tags</th>
+          <th class="sortable" data-sort="branch">Branch</th>
+          <th class="sortable" data-sort="is_clean">State</th>
+          <th class="sortable" data-sort="staged_count">Staged</th>
+          <th class="sortable" data-sort="unstaged_count">Unstaged</th>
+          <th class="sortable" data-sort="untracked_count">Untracked</th>
+          <th class="sortable" data-sort="ahead_count">↑</th>
+          <th class="sortable" data-sort="behind_count">↓</th>
+          <th class="sortable" data-sort="latest_commit_date">Last Commit</th>
+          <th class="sortable" data-sort="scanned_at">Last Scan</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="repo-tbody">
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Empty State -->
+  <div id="empty-state" class="empty-state hidden">
+    <div class="empty-icon">📂</div>
+    <h2>No repositories tracked yet</h2>
+    <p>Add your first repository to get started.</p>
+    <button id="btn-add-first" class="btn btn-primary">+ Add Your First Repo</button>
+  </div>
+
+  <!-- Loading State -->
+  <div id="loading-state" class="loading-state">
+    <div class="spinner"></div>
+    <p>Loading repositories...</p>
+  </div>
+
+  <!-- Error State -->
+  <div id="error-state" class="error-state hidden">
+    <div class="error-icon">⚠</div>
+    <h2>Unable to connect to RepoRadar server</h2>
+    <p>Make sure the server is running on <code>http://127.0.0.1:8080</code></p>
+    <button onclick="location.reload()" class="btn btn-primary">Retry</button>
+  </div>
+</div>
+
+<!-- Add Repo Modal -->
+<div id="modal-add" class="modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Add Repository</h3>
+      <button class="modal-close" onclick="closeModal('modal-add')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="add-path">Local Path *</label>
+        <input type="text" id="add-path" placeholder="/Users/me/projects/my-repo">
+      </div>
+      <div class="form-group">
+        <label for="add-name">Display Name (optional)</label>
+        <input type="text" id="add-name" placeholder="My Project">
+      </div>
+      <div class="form-group">
+        <label for="add-group">Group (optional)</label>
+        <input type="text" id="add-group" placeholder="work, personal, oss">
+      </div>
+      <div class="form-group">
+        <label for="add-tags">Tags (comma-separated, optional)</label>
+        <input type="text" id="add-tags" placeholder="frontend, react">
+      </div>
+      <div class="form-group">
+        <label for="add-notes">Notes (optional)</label>
+        <textarea id="add-notes" rows="2" placeholder="Any notes about this repo..."></textarea>
+      </div>
+      <div id="add-error" class="form-error hidden"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal('modal-add')">Cancel</button>
+        <button class="btn btn-primary" id="btn-add-confirm">Add Repository</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Repo Modal -->
+<div id="modal-edit" class="modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Edit Repository</h3>
+      <button class="modal-close" onclick="closeModal('modal-edit')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-id">
+      <div class="form-group">
+        <label for="edit-name">Display Name</label>
+        <input type="text" id="edit-name">
+      </div>
+      <div class="form-group">
+        <label for="edit-group">Group</label>
+        <input type="text" id="edit-group">
+      </div>
+      <div class="form-group">
+        <label for="edit-tags">Tags (comma-separated)</label>
+        <input type="text" id="edit-tags">
+      </div>
+      <div class="form-group">
+        <label for="edit-notes">Notes</label>
+        <textarea id="edit-notes" rows="2"></textarea>
+      </div>
+      <div id="edit-error" class="form-error hidden"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal('modal-edit')">Cancel</button>
+        <button class="btn btn-primary" id="btn-edit-confirm">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Scan Progress Modal -->
+<div id="modal-scan" class="modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Scanning Repositories</h3>
+    </div>
+    <div class="modal-body">
+      <div class="progress-bar-container">
+        <div id="progress-bar" class="progress-bar"></div>
+      </div>
+      <p id="scan-current" class="scan-current-text">Starting...</p>
+      <p id="scan-stats" class="scan-stats-text"></p>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

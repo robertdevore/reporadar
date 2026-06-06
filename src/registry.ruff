@@ -1,0 +1,213 @@
+// registry.ruff — RepoRadar Repo Registry CRUD Operations
+
+from src.scanner import validate_repo_path, validate_git_repo, get_canonical_path
+
+/// add_repo validates and adds a repo to the registry.
+export func add_repo(db, path, display_name, group_name, tags, notes, pinned) {
+	if display_name == null { display_name = "" }
+	if group_name == null { group_name = "" }
+	if tags == null { tags = "" }
+	if notes == null { notes = "" }
+	if pinned == null { pinned = 0 }
+
+	// Validate path
+	mut path_error = validate_repo_path(path)
+	if path_error != null {
+		return {"success": false, "error": path_error}
+	}
+
+	// Validate git repo
+	if !validate_git_repo(path) {
+		return {"success": false, "error": "Not a valid Git repository: " + path}
+	}
+
+	// Get canonical path
+	mut canonical = get_canonical_path(path)
+
+	// Check for duplicate path
+	mut existing = db_query(db, "SELECT id FROM repos WHERE path = '" + replace_str(canonical, "'", "''") + "'")
+	if len(existing) > 0 {
+		return {"success": false, "error": "Repository already tracked at: " + canonical}
+	}
+
+	// Derive name from path if not provided
+	if display_name == "" {
+		display_name = basename(canonical)
+	}
+
+	mut safe_name = replace_str(display_name, "'", "''")
+	mut safe_path = replace_str(canonical, "'", "''")
+	mut safe_group = replace_str(group_name, "'", "''")
+	mut safe_tags = replace_str(tags, "'", "''")
+	mut safe_notes = replace_str(notes, "'", "''")
+
+	db_execute(db, "INSERT INTO repos (name, display_name, path, group_name, tags, notes, pinned) VALUES ('" + safe_name + "', '" + safe_name + "', '" + safe_path + "', '" + safe_group + "', '" + safe_tags + "', '" + safe_notes + "', " + to_string(pinned) + ")")
+
+	mut rows = db_query(db, "SELECT last_insert_rowid() as id")
+	if len(rows) > 0 {
+		mut repo_id = rows[0]["id"]
+		return {"success": true, "id": to_int(repo_id), "path": canonical}
+	}
+
+	return {"success": false, "error": "Failed to retrieve new repo ID"}
+}
+
+/// remove_repo soft-deletes a repo from tracking (archives it).
+export func remove_repo(db, repo_id) {
+	mut rows = db_query(db, "SELECT id FROM repos WHERE id = " + to_string(repo_id))
+	if len(rows) == 0 {
+		return {"success": false, "error": "Repository not found with ID: " + to_string(repo_id)}
+	}
+
+	db_execute(db, "UPDATE repos SET archived = 1, updated_at = datetime('now') WHERE id = " + to_string(repo_id))
+	return {"success": true}
+}
+
+/// update_repo updates repo metadata.
+export func update_repo(db, repo_id, display_name, group_name, tags, notes, pinned, archived) {
+	mut rows = db_query(db, "SELECT id FROM repos WHERE id = " + to_string(repo_id))
+	if len(rows) == 0 {
+		return {"success": false, "error": "Repository not found with ID: " + to_string(repo_id)}
+	}
+
+	mut updates = []
+	if display_name != null {
+		updates = push(updates, "display_name = '" + replace_str(display_name, "'", "''") + "'")
+	}
+	if group_name != null {
+		updates = push(updates, "group_name = '" + replace_str(group_name, "'", "''") + "'")
+	}
+	if tags != null {
+		updates = push(updates, "tags = '" + replace_str(tags, "'", "''") + "'")
+	}
+	if notes != null {
+		updates = push(updates, "notes = '" + replace_str(notes, "'", "''") + "'")
+	}
+	if pinned != null {
+		updates = push(updates, "pinned = " + to_string(pinned))
+	}
+	if archived != null {
+		updates = push(updates, "archived = " + to_string(archived))
+	}
+
+	if len(updates) == 0 {
+		return {"success": false, "error": "No fields to update"}
+	}
+
+	updates = push(updates, "updated_at = datetime('now')")
+
+	mut set_clause = join(updates, ", ")
+	db_execute(db, "UPDATE repos SET " + set_clause + " WHERE id = " + to_string(repo_id))
+	return {"success": true}
+}
+
+/// get_all_repos returns all non-archived tracked repos with their latest status.
+export func get_all_repos(db) {
+	mut query = "SELECT r.*, s.branch, s.remote_url, s.upstream_branch, s.latest_commit_hash, s.latest_commit_short_hash, s.latest_commit_message, s.latest_commit_author, s.latest_commit_date, s.is_clean, s.staged_count, s.unstaged_count, s.untracked_count, s.changed_total, s.ahead_count, s.behind_count, s.is_diverged, s.is_detached, s.has_remote, s.scan_error, s.scanned_at FROM repos r LEFT JOIN (SELECT repo_id, branch, remote_url, upstream_branch, latest_commit_hash, latest_commit_short_hash, latest_commit_message, latest_commit_author, latest_commit_date, is_clean, staged_count, unstaged_count, untracked_count, changed_total, ahead_count, behind_count, is_diverged, is_detached, has_remote, scan_error, scanned_at, ROW_NUMBER() OVER (PARTITION BY repo_id ORDER BY scanned_at DESC) as rn FROM repo_status_snapshots) s ON r.id = s.repo_id AND s.rn = 1 WHERE r.archived = 0 ORDER BY r.pinned DESC, r.name ASC"
+	return db_query(db, query)
+}
+
+/// get_repo_by_id returns a single repo with its latest status.
+export func get_repo_by_id(db, repo_id) {
+	mut query = "SELECT r.*, s.id as snapshot_id, s.branch, s.remote_url, s.upstream_branch, s.latest_commit_hash, s.latest_commit_short_hash, s.latest_commit_message, s.latest_commit_author, s.latest_commit_date, s.is_clean, s.staged_count, s.unstaged_count, s.untracked_count, s.changed_total, s.ahead_count, s.behind_count, s.is_diverged, s.is_detached, s.has_remote, s.scan_error, s.scanned_at FROM repos r LEFT JOIN (SELECT id, repo_id, branch, remote_url, upstream_branch, latest_commit_hash, latest_commit_short_hash, latest_commit_message, latest_commit_author, latest_commit_date, is_clean, staged_count, unstaged_count, untracked_count, changed_total, ahead_count, behind_count, is_diverged, is_detached, has_remote, scan_error, scanned_at, ROW_NUMBER() OVER (PARTITION BY repo_id ORDER BY scanned_at DESC) as rn FROM repo_status_snapshots) s ON r.id = s.repo_id AND s.rn = 1 WHERE r.id = " + to_string(repo_id)
+	mut rows = db_query(db, query)
+	if len(rows) > 0 {
+		return rows[0]
+	}
+	return null
+}
+
+/// store_scan_result saves a scan result to the database.
+export func store_scan_result(db, repo_id, scan_data) {
+	mut safe_branch = replace_str(scan_data["branch"], "'", "''")
+	mut safe_remote = replace_str(scan_data["remote_url"], "'", "''")
+	mut safe_upstream = replace_str(scan_data["upstream_branch"], "'", "''")
+	mut safe_hash = replace_str(scan_data["latest_commit_hash"], "'", "''")
+	mut safe_short = replace_str(scan_data["latest_commit_short_hash"], "'", "''")
+	mut safe_msg = replace_str(scan_data["latest_commit_message"], "'", "''")
+	mut safe_author = replace_str(scan_data["latest_commit_author"], "'", "''")
+	mut safe_date = replace_str(scan_data["latest_commit_date"], "'", "''")
+	mut safe_error = replace_str(scan_data["error"], "'", "''")
+
+	mut sql = "INSERT INTO repo_status_snapshots (repo_id, branch, remote_url, upstream_branch, latest_commit_hash, latest_commit_short_hash, latest_commit_message, latest_commit_author, latest_commit_date, is_clean, staged_count, unstaged_count, untracked_count, changed_total, ahead_count, behind_count, is_diverged, is_detached, has_remote, scan_error) VALUES (" + to_string(repo_id) + ", '" + safe_branch + "', '" + safe_remote + "', '" + safe_upstream + "', '" + safe_hash + "', '" + safe_short + "', '" + safe_msg + "', '" + safe_author + "', '" + safe_date + "', " + to_string(scan_data["is_clean"]) + ", " + to_string(scan_data["staged_count"]) + ", " + to_string(scan_data["unstaged_count"]) + ", " + to_string(scan_data["untracked_count"]) + ", " + to_string(scan_data["changed_total"]) + ", " + to_string(scan_data["ahead_count"]) + ", " + to_string(scan_data["behind_count"]) + ", " + to_string(scan_data["is_diverged"]) + ", " + to_string(scan_data["is_detached"]) + ", " + to_string(scan_data["has_remote"]) + ", '" + safe_error + "')"
+
+	db_execute(db, sql)
+
+	mut id_rows = db_query(db, "SELECT last_insert_rowid() as id")
+	mut snapshot_id = 0
+	if len(id_rows) > 0 {
+		snapshot_id = to_int(id_rows[0]["id"])
+	}
+
+	// Store file changes
+	if scan_data["success"] {
+		mut file_changes = scan_data["file_changes"]
+		mut fi = 0
+		while fi < len(file_changes) {
+			mut fc = file_changes[fi]
+			fi = fi + 1
+			mut safe_file = replace_str(fc["file_path"], "'", "''")
+			mut safe_code = replace_str(fc["status_code"], "'", "''")
+			mut safe_label = replace_str(fc["status_label"], "'", "''")
+			db_execute(db, "INSERT INTO repo_file_changes (repo_id, snapshot_id, file_path, status_code, status_label, staged, unstaged, untracked) VALUES (" + to_string(repo_id) + ", " + to_string(snapshot_id) + ", '" + safe_file + "', '" + safe_code + "', '" + safe_label + "', " + to_string(fc["staged"]) + ", " + to_string(fc["unstaged"]) + ", " + to_string(fc["untracked"]) + ")")
+		}
+	}
+
+	// Update repo last_scan_at and last_error
+	db_execute(db, "UPDATE repos SET last_scan_at = datetime('now'), last_error = '" + safe_error + "', updated_at = datetime('now') WHERE id = " + to_string(repo_id))
+
+	return snapshot_id
+}
+
+/// get_repo_file_changes returns file changes for a repo's latest snapshot.
+export func get_repo_file_changes(db, repo_id) {
+	mut query = "SELECT fc.* FROM repo_file_changes fc INNER JOIN repo_status_snapshots s ON fc.snapshot_id = s.id WHERE fc.repo_id = " + to_string(repo_id) + " ORDER BY s.scanned_at DESC, fc.file_path ASC"
+	return db_query(db, query)
+}
+
+/// get_repo_scan_history returns recent scan snapshots for a repo.
+export func get_repo_scan_history(db, repo_id, limit) {
+	if limit == null { limit = 10 }
+	return db_query(db, "SELECT * FROM repo_status_snapshots WHERE repo_id = " + to_string(repo_id) + " ORDER BY scanned_at DESC LIMIT " + to_string(limit))
+}
+
+/// store_repo_commits saves collected commits to the database.
+export func store_repo_commits(db, repo_id, commits) {
+	mut i = 0
+	while i < len(commits) {
+		mut c = commits[i]
+		i = i + 1
+
+		mut safe_hash = replace_str(c["hash"], "'", "''")
+		mut safe_short = replace_str(c["short_hash"], "'", "''")
+		mut safe_author = replace_str(c["author"], "'", "''")
+		mut safe_date = replace_str(c["date"], "'", "''")
+		mut safe_msg = replace_str(c["message"], "'", "''")
+
+		mut existing = db_query(db, "SELECT id FROM repo_commits WHERE repo_id = " + to_string(repo_id) + " AND commit_hash = '" + safe_hash + "'")
+		if len(existing) == 0 {
+			db_execute(db, "INSERT INTO repo_commits (repo_id, commit_hash, short_hash, author, date, message) VALUES (" + to_string(repo_id) + ", '" + safe_hash + "', '" + safe_short + "', '" + safe_author + "', '" + safe_date + "', '" + safe_msg + "')")
+		}
+	}
+}
+
+/// get_repo_commits returns recent commits for a repo.
+export func get_repo_commits(db, repo_id, limit) {
+	if limit == null { limit = 20 }
+	return db_query(db, "SELECT * FROM repo_commits WHERE repo_id = " + to_string(repo_id) + " ORDER BY date DESC LIMIT " + to_string(limit))
+}
+
+/// get_commits_in_window returns commits across all repos within a time window.
+export func get_commits_in_window(db, days) {
+	return db_query(db, "SELECT rc.*, r.name as repo_name, r.display_name as repo_display_name, r.path as repo_path FROM repo_commits rc INNER JOIN repos r ON rc.repo_id = r.id WHERE rc.date >= datetime('now', '-" + to_string(days) + " days') AND r.archived = 0 ORDER BY rc.date DESC")
+}
+
+/// get_commits_by_day returns commit counts grouped by day for all repos.
+export func get_commits_by_day(db, days) {
+	return db_query(db, "SELECT date(rc.date) as day, COUNT(*) as count FROM repo_commits rc INNER JOIN repos r ON rc.repo_id = r.id WHERE rc.date >= datetime('now', '-" + to_string(days) + " days') AND r.archived = 0 GROUP BY date(rc.date) ORDER BY day ASC")
+}
+
+/// get_commit_count_per_repo returns commit counts per repo for a time window.
+export func get_commit_count_per_repo(db, days) {
+	return db_query(db, "SELECT rc.repo_id, r.name as repo_name, r.display_name, r.path, COUNT(*) as commit_count FROM repo_commits rc INNER JOIN repos r ON rc.repo_id = r.id WHERE rc.date >= datetime('now', '-" + to_string(days) + " days') AND r.archived = 0 GROUP BY rc.repo_id ORDER BY commit_count DESC")
+}

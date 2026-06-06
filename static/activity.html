@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activity — RepoRadar</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+.activity-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+@media (max-width: 900px) { .activity-layout { grid-template-columns: 1fr; } }
+.card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; }
+.card h3 { margin-bottom: 12px; font-size: 14px; color: var(--text-secondary); }
+.card-full { grid-column: 1 / -1; }
+.chart-bar { display: flex; align-items: end; gap: 2px; height: 120px; margin-top: 8px; }
+.chart-bar-item { flex: 1; background: var(--accent-blue); border-radius: 2px 2px 0 0; min-height: 2px; position: relative; }
+.chart-bar-item:hover { background: var(--accent-cyan); }
+.chart-label { font-size: 10px; color: var(--text-muted); text-align: center; margin-top: 4px; }
+.chart-value { font-size: 10px; color: var(--text-secondary); text-align: center; }
+.repo-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border-color); font-size: 13px; }
+.repo-count { font-weight: 600; color: var(--accent-blue); }
+.commit-feed { max-height: 400px; overflow-y: auto; }
+.commit-item { padding: 6px 0; border-bottom: 1px solid var(--border-color); font-size: 13px; }
+.commit-repo { color: var(--accent-cyan); font-size: 12px; }
+.commit-msg { color: var(--text-primary); }
+.commit-meta { color: var(--text-muted); font-size: 12px; }
+.summary-cards { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.window-select { display: flex; gap: 4px; margin-bottom: 16px; }
+.window-btn { padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-secondary); cursor: pointer; font-size: 13px; }
+.window-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+</style>
+</head>
+<body>
+<div id="app" style="max-width:1200px;margin:0 auto;padding:0 24px 48px;">
+  <header class="header">
+    <div class="header-left">
+      <h1 class="logo">🔭 RepoRadar</h1>
+      <span class="version">v0.1.0</span>
+    </div>
+    <div class="header-right">
+      <a href="/" class="btn btn-ghost">← Dashboard</a>
+    </div>
+  </header>
+
+  <div class="nav-back"><a href="/">← Back to Dashboard</a></div>
+
+  <div class="window-select" id="window-btns">
+    <button class="window-btn" data-days="1">1 day</button>
+    <button class="window-btn" data-days="3">3 days</button>
+    <button class="window-btn active" data-days="7">7 days</button>
+    <button class="window-btn" data-days="14">14 days</button>
+    <button class="window-btn" data-days="30">30 days</button>
+    <button class="window-btn" data-days="90">90 days</button>
+  </div>
+
+  <div class="summary-cards" id="summary-cards">
+    <div class="summary-card"><span class="summary-label">Total Commits</span><span class="summary-value" id="sum-total" style="color:var(--accent-blue)">-</span></div>
+    <div class="summary-card"><span class="summary-label">Active Repos</span><span class="summary-value" id="sum-active" style="color:var(--accent-green)">-</span></div>
+    <div class="summary-card"><span class="summary-label">Stale Repos</span><span class="summary-value" id="sum-stale" style="color:var(--accent-red)">-</span></div>
+  </div>
+
+  <div id="loading-state" class="loading-state"><div class="spinner"></div><p>Loading activity data...</p></div>
+  <div id="activity-content" class="hidden">
+    <div class="activity-layout">
+      <div class="card">
+        <h3>📊 Commits per Day</h3>
+        <div id="chart-container"></div>
+      </div>
+      <div class="card">
+        <h3>🔥 Most Active Repos</h3>
+        <div id="most-active"></div>
+      </div>
+      <div class="card">
+        <h3>🐢 Least Active Repos</h3>
+        <div id="least-active"></div>
+      </div>
+      <div class="card">
+        <h3>💤 Stale Repos (No Activity)</h3>
+        <div id="stale-repos"></div>
+      </div>
+      <div class="card card-full">
+        <h3>📝 Recent Commit Feed</h3>
+        <div class="commit-feed" id="commit-feed"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="/activity.js"></script>
+</body>
+</html>

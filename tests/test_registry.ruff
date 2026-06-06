@@ -1,0 +1,108 @@
+// RepoRadar Registry & Database Tests
+// Run: ruff test-run tests/test_registry.ruff
+
+from src.db import init_db, get_setting, set_setting
+from src.registry import add_repo, remove_repo, update_repo, get_all_repos, get_repo_by_id
+
+// === Database Tests ===
+
+test_group "Database — init and settings" {
+	test "init_db creates database and returns connection" {
+		// Use in-memory database for testing
+		let db_path = ":memory:"
+		let db = db_connect("sqlite", db_path)
+		
+		// Verify we can create tables and query
+		db_execute(db, "CREATE TABLE test_table (id INTEGER PRIMARY KEY, value TEXT)")
+		db_execute(db, "INSERT INTO test_table (value) VALUES ('hello')")
+		let rows = db_query(db, "SELECT * FROM test_table")
+		assert_equal(len(rows), 1)
+		assert_equal(rows[0]["value"], "hello")
+	}
+
+	test "setting can be stored and retrieved" {
+		let db = db_connect("sqlite", ":memory:")
+		db_execute(db, "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+		
+		set_setting(db, "test_key", "test_value")
+		let result = get_setting(db, "test_key", "default")
+		assert_equal(result, "test_value")
+	}
+
+	test "get_setting returns default when key missing" {
+		let db = db_connect("sqlite", ":memory:")
+		db_execute(db, "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+		
+		let result = get_setting(db, "missing_key", "fallback")
+		assert_equal(result, "fallback")
+	}
+}
+
+// === Registry Tests ===
+
+test_group "Registry — add and query repos" {
+	test "add_repo validates invalid path" {
+		let db = db_connect("sqlite", ":memory:")
+		db_execute(db, "CREATE TABLE IF NOT EXISTS repos (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_name TEXT, path TEXT NOT NULL UNIQUE, group_name TEXT DEFAULT '', tags TEXT DEFAULT '', notes TEXT DEFAULT '', pinned INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), last_scan_at TEXT, last_error TEXT)")
+		
+		let result = add_repo(db, "/nonexistent/path/xyz", "", "", "", "", 0)
+		assert_false(result["success"])
+		assert_true(contains(result["error"], "exist") == 1 || contains(result["error"], "not") == 1)
+	}
+
+	test "add_repo rejects non-git directory" {
+		let db = db_connect("sqlite", ":memory:")
+		db_execute(db, "CREATE TABLE IF NOT EXISTS repos (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_name TEXT, path TEXT NOT NULL UNIQUE, group_name TEXT DEFAULT '', tags TEXT DEFAULT '', notes TEXT DEFAULT '', pinned INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), last_scan_at TEXT, last_error TEXT)")
+		
+		// /tmp exists but is not a git repo
+		let result = add_repo(db, "/tmp", "", "", "", "", 0)
+		// Should fail because /tmp is not a git repo
+		assert_false(result["success"])
+	}
+
+	test "get_all_repos returns empty list for fresh db" {
+		let db = db_connect("sqlite", ":memory:")
+		db_execute(db, "CREATE TABLE IF NOT EXISTS repos (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_name TEXT, path TEXT NOT NULL UNIQUE, group_name TEXT DEFAULT '', tags TEXT DEFAULT '', notes TEXT DEFAULT '', pinned INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), last_scan_at TEXT, last_error TEXT)")
+		
+		let repos = get_all_repos(db)
+		assert_equal(len(repos), 0)
+	}
+
+	test "remove_repo returns error for non-existent id" {
+		let db = db_connect("sqlite", ":memory:")
+		db_execute(db, "CREATE TABLE IF NOT EXISTS repos (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_name TEXT, path TEXT NOT NULL UNIQUE, group_name TEXT DEFAULT '', tags TEXT DEFAULT '', notes TEXT DEFAULT '', pinned INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), last_scan_at TEXT, last_error TEXT)")
+		
+		let result = remove_repo(db, 999)
+		assert_false(result["success"])
+		assert_true(contains(result["error"], "not found") == 1)
+	}
+
+	test "get_repo_by_id returns null for missing repo" {
+		let db = db_connect("sqlite", ":memory:")
+		db_execute(db, "CREATE TABLE IF NOT EXISTS repos (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_name TEXT, path TEXT NOT NULL UNIQUE, group_name TEXT DEFAULT '', tags TEXT DEFAULT '', notes TEXT DEFAULT '', pinned INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), last_scan_at TEXT, last_error TEXT)")
+		
+		let repo = get_repo_by_id(db, 999)
+		assert_equal(repo, null)
+	}
+}
+
+test_group "Registry — update repo metadata" {
+	test "update_repo modifies display name" {
+		let db = db_connect("sqlite", ":memory:")
+		db_execute(db, "CREATE TABLE IF NOT EXISTS repos (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_name TEXT, path TEXT NOT NULL UNIQUE, group_name TEXT DEFAULT '', tags TEXT DEFAULT '', notes TEXT DEFAULT '', pinned INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), last_scan_at TEXT, last_error TEXT)")
+		
+		// Insert a repo manually for testing
+		db_execute(db, "INSERT INTO repos (name, path) VALUES ('test', '/fake/path')")
+		
+		let result = update_repo(db, 1, "My Display Name", "work", "tag1,tag2", "some notes", 1, null)
+		assert_true(result["success"])
+	}
+
+	test "update_repo returns error for non-existent id" {
+		let db = db_connect("sqlite", ":memory:")
+		db_execute(db, "CREATE TABLE IF NOT EXISTS repos (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_name TEXT, path TEXT NOT NULL UNIQUE, group_name TEXT DEFAULT '', tags TEXT DEFAULT '', notes TEXT DEFAULT '', pinned INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), last_scan_at TEXT, last_error TEXT)")
+		
+		let result = update_repo(db, 999, "Test", null, null, null, null, null)
+		assert_false(result["success"])
+	}
+}
