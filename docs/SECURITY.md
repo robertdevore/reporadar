@@ -35,7 +35,7 @@ When write actions (Phase 07) are implemented:
 
 - Repo paths are validated to exist and be directories
 - Git repo validation via `git rev-parse --is-inside-work-tree`
-- SQL values are escaped via `replace_str(value, "'", "''")`
+- SQL values are escaped via the shared `escape_sql(...)` helper
 - JSON import validates structure before processing
 - Path traversal is prevented by filesystem API design
 

@@ -7,6 +7,7 @@
 - Git scanner: status, branch, remote, ahead/behind, latest commit
 - Dashboard with sortable, filterable, searchable table
 - Summary bar showing clean/dirty/ahead/behind/diverged counts
+- Summary bar now includes no-remote, errors, and stale counts
 - Commit activity view with configurable time windows (1-90 days)
 - Activity visualization with commit-per-day bar chart
 - Most active and least active repo lists
@@ -14,6 +15,7 @@
 - Repo detail page with file-level changes and commit history
 - Parent folder discovery for bulk-adding repos
 - Bulk scan all tracked repos
+- Bulk scan modal reports clean/dirty/error totals
 - Settings page with configurable thresholds
 - JSON export/import for registry portability
 - Database backup/restore

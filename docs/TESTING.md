@@ -67,9 +67,8 @@ test "parse_git_status clean repo" {
 }
 ```
 
-## TODO
+## Current Status
 
-- [ ] Write scanner unit tests
-- [ ] Write registry CRUD tests
-- [ ] Write integration tests
-- [ ] Set up CI pipeline
+- Scanner unit tests, registry CRUD tests, and integration tests already live in `tests/`.
+- Regression coverage now includes escaped setting values, shell-quoted paths, latest-snapshot file changes, and duplicate commit handling.
+- The next useful step is to grow edge-case coverage and wire the suites into CI.

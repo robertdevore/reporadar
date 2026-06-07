@@ -4,6 +4,7 @@
 
 ```
 reporadar/
+  README.md         # Top-level project overview
   ruff.toml           # Project configuration
   src/
     main.ruff         # CLI entry point
@@ -23,8 +24,9 @@ reporadar/
     discovery.js
     settings.html     # Settings page
     settings.js
-  tests/              # Test files (TODO)
+  tests/              # Test suites
   docs/               # Documentation
+  agent/              # Handoff and session planning notes
 ```
 
 ## Running

@@ -70,6 +70,6 @@ All Git operations use safe, read-only subcommands:
 
 - Server binds to `127.0.0.1` only (no network exposure)
 - Read-only Git commands only (no destructive operations)
-- SQL injection mitigated via quote escaping
+- SQL injection mitigated via the shared `escape_sql(...)` helper
 - No telemetry, analytics, or data upload
 - Frontend served locally; no CDN dependencies

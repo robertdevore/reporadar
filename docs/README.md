@@ -1,4 +1,6 @@
-# RepoRadar
+# RepoRadar Documentation
+
+For the top-level project overview and quick start, see [`../README.md`](../README.md).
 
 🔭 **RepoRadar** is a Ruff-powered local-first dashboard for tracking repo status, activity, branches, commits, and uncommitted work across your entire local development ecosystem.
 
@@ -9,7 +11,7 @@ A local Git command center that shows at-a-glance visibility across all your loc
 ## Features
 
 - **Repo Registry** — Add, edit, and remove tracked repos
-- **Dashboard** — Sort, filter, and search all repos with status indicators
+- **Dashboard** — Sort, filter, and search all repos with status indicators and summary counts
 - **Activity View** — Commit counts over configurable time windows
 - **Repo Detail** — Per-repo file changes, recent commits, scan history
 - **Discovery** — Find repos under parent directories
