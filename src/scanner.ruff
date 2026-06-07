@@ -3,8 +3,13 @@
 
 /// validate_git_repo checks if a path is a valid Git repository.
 /// Returns true if it's a valid git repo, false otherwise.
+export func shell_quote(value) {
+	mut safe_value = replace_str(to_string(value), "'", "'\"'\"'")
+	return "'" + safe_value + "'"
+}
+
 export func validate_git_repo(path) {
-	mut result = execute_status("git -C " + path + " rev-parse --is-inside-work-tree 2>/dev/null")
+	mut result = execute_status("git -C " + shell_quote(path) + " rev-parse --is-inside-work-tree 2>/dev/null")
 	if result.success && result.exitcode == 0 {
 		mut stdout = trim(result.stdout)
 		if stdout == "true" {
@@ -28,7 +33,7 @@ export func validate_repo_path(path) {
 
 /// get_canonical_path returns the git repo root (top-level) path.
 export func get_canonical_path(repo_path) {
-	mut result = execute_status("git -C " + repo_path + " rev-parse --show-toplevel 2>/dev/null")
+	mut result = execute_status("git -C " + shell_quote(repo_path) + " rev-parse --show-toplevel 2>/dev/null")
 	if result.success && result.exitcode == 0 {
 		return trim(result.stdout)
 	}
@@ -38,7 +43,7 @@ export func get_canonical_path(repo_path) {
 /// get_current_branch returns the current branch name.
 /// Returns empty string if detached HEAD.
 export func get_current_branch(repo_path) {
-	mut result = execute_status("git -C " + repo_path + " branch --show-current 2>/dev/null")
+	mut result = execute_status("git -C " + shell_quote(repo_path) + " branch --show-current 2>/dev/null")
 	if result.success && result.exitcode == 0 {
 		return trim(result.stdout)
 	}
@@ -73,7 +78,7 @@ export func parse_git_status(output) {
 		}
 
 		// Branch header line: ## branch...upstream [ahead N, behind M]
-		if starts_with(line, "## ") == 1 {
+		if starts_with(line, "## ") {
 			mut header = substring(line, 3, len(line))
 
 			// Check for initial commit state
@@ -151,7 +156,7 @@ export func parse_git_status(output) {
 			mut filename = trim(substring(line, 3, len(line)))
 
 			// Handle rename (first line may show old -> new)
-			if starts_with(status_code, "R") == 1 {
+			if starts_with(status_code, "R") {
 				// Renamed file
 				result["unstaged_count"] = result["unstaged_count"] + 1
 				result["changed_total"] = result["changed_total"] + 1
@@ -236,7 +241,7 @@ mut staged = 0
 /// get_latest_commit returns the latest commit info as a dict.
 /// Uses null-safe parsing.
 export func get_latest_commit(repo_path) {
-	mut result = execute_status("git -C " + repo_path + " log -1 --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null")
+	mut result = execute_status("git -C " + shell_quote(repo_path) + " log -1 --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null")
 	if !result.success || result.exitcode != 0 {
 		return {
 			"hash": "",
@@ -279,7 +284,7 @@ export func get_latest_commit(repo_path) {
 
 /// get_remote_url returns the origin remote URL, or empty string if none.
 export func get_remote_url(repo_path) {
-	mut result = execute_status("git -C " + repo_path + " remote get-url origin 2>/dev/null")
+	mut result = execute_status("git -C " + shell_quote(repo_path) + " remote get-url origin 2>/dev/null")
 	if result.success && result.exitcode == 0 {
 		return trim(result.stdout)
 	}
@@ -295,14 +300,14 @@ export func get_upstream_info(repo_path) {
 	}
 
 	// Get upstream branch name
-	mut upstream_result = execute_status("git -C " + repo_path + " rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null")
+	mut upstream_result = execute_status("git -C " + shell_quote(repo_path) + " rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null")
 	if upstream_result.success && upstream_result.exitcode == 0 {
 		info["upstream_branch"] = trim(upstream_result.stdout)
 	}
 
 	// Get ahead/behind counts (alternative to status parsing)
 	if info["upstream_branch"] != "" {
-		mut count_result = execute_status("git -C " + repo_path + " rev-list --left-right --count HEAD...@{u} 2>/dev/null")
+		mut count_result = execute_status("git -C " + shell_quote(repo_path) + " rev-list --left-right --count HEAD...@{u} 2>/dev/null")
 		if count_result.success && count_result.exitcode == 0 {
 			mut counts = trim(count_result.stdout)
 			mut parts = split(counts, "\t")
@@ -368,7 +373,7 @@ export func scan_repo(repo_path) {
 	// Get branch and status via porcelain
 	mut status_output = ""
 	try {
-		mut status_result = execute_status("git -C " + repo_path + " status --porcelain=v1 --branch 2>/dev/null")
+		mut status_result = execute_status("git -C " + shell_quote(repo_path) + " status --porcelain=v1 --branch 2>/dev/null")
 		if status_result.success && status_result.exitcode == 0 {
 			status_output = status_result.stdout
 		} else {
@@ -393,10 +398,10 @@ export func scan_repo(repo_path) {
 	result["file_changes"] = status_data["file_changes"]
 
 	// Check for detached HEAD
-	if result["branch"] == "" || starts_with(result["branch"], "HEAD detached") == 1 {
+	if result["branch"] == "" || starts_with(result["branch"], "HEAD detached") {
 		result["is_detached"] = 1
 		// Try to get branch info via rev-parse
-		mut head_result = execute_status("git -C " + repo_path + " rev-parse --abbrev-ref HEAD 2>/dev/null")
+		mut head_result = execute_status("git -C " + shell_quote(repo_path) + " rev-parse --abbrev-ref HEAD 2>/dev/null")
 		if head_result.success && head_result.exitcode == 0 {
 			mut head_ref = trim(head_result.stdout)
 			if head_ref == "HEAD" {
@@ -456,9 +461,9 @@ export func collect_recent_commits(repo_path, days) {
 	mut command = ""
 
 	if days > 0 {
-		command = "git -C " + repo_path + " log --since=\"" + to_string(days) + " days ago\" --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null"
+		command = "git -C " + shell_quote(repo_path) + " log --since=\"" + to_string(days) + " days ago\" --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null"
 	} else {
-		command = "git -C " + repo_path + " log -20 --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null"
+		command = "git -C " + shell_quote(repo_path) + " log -20 --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null"
 	}
 
 	mut result = execute_status(command)

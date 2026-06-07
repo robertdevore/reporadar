@@ -1,7 +1,7 @@
 // server.ruff — RepoRadar HTTP Server + API Routes
 // Serves the dashboard UI and provides JSON API endpoints.
 
-from src.db import init_db, get_db_path, get_setting, set_setting
+from src.db import init_db, get_db_path, get_setting, set_setting, escape_sql
 from src.scanner import validate_git_repo, validate_repo_path, get_canonical_path, scan_repo, collect_recent_commits
 from src.registry import add_repo, remove_repo, update_repo, get_all_repos, get_repo_by_id, store_scan_result, store_repo_commits, get_repo_file_changes, get_repo_scan_history, get_repo_commits, get_commits_in_window, get_commits_by_day, get_commit_count_per_repo
 
@@ -10,8 +10,7 @@ export func cors_headers() {
 	return {
 		"Access-Control-Allow-Origin": "*",
 		"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-		"Access-Control-Allow-Headers": "Content-Type",
-		"Content-Type": "application/json"
+		"Access-Control-Allow-Headers": "Content-Type"
 	}
 }
 
@@ -314,6 +313,11 @@ export func api_dashboard_summary(req) {
 		summary["last_full_scan"] = scan_rows[0]["last_scan"]
 	}
 
+	mut stale_rows = db_query(db, "SELECT COUNT(*) as stale_count FROM repos r LEFT JOIN (SELECT repo_id, latest_commit_date, ROW_NUMBER() OVER (PARTITION BY repo_id ORDER BY scanned_at DESC) as rn FROM repo_status_snapshots) s ON r.id = s.repo_id AND s.rn = 1 WHERE r.archived = 0 AND (s.latest_commit_date IS NULL OR s.latest_commit_date = '' OR julianday('now') - julianday(s.latest_commit_date) > " + to_string(stale_days) + ")")
+	if len(stale_rows) > 0 && stale_rows[0]["stale_count"] != null {
+		summary["stale"] = stale_rows[0]["stale_count"]
+	}
+
 	return add_cors(json_response(200, {"success": true, "summary": summary}))
 }
 
@@ -326,6 +330,12 @@ export func api_activity(req) {
 	mut query_params = req["query"]
 	mut days_str = get_default(query_params, "days", "7")
 	mut days = parse_int(days_str)
+	if days < 1 {
+		days = 7
+	}
+	if days > 365 {
+		days = 365
+	}
 
 	mut db = init_db()
 	mut commits = get_commits_in_window(db, days)
@@ -420,6 +430,8 @@ export func api_bulk_scan(req) {
 		"total": len(repos),
 		"scanned": 0,
 		"errors": 0,
+		"clean": 0,
+		"dirty": 0,
 		"repo_results": []
 	}
 
@@ -435,6 +447,11 @@ export func api_bulk_scan(req) {
 			mut commits = collect_recent_commits(repo["path"], 0)
 			store_repo_commits(db, repo["id"], commits)
 			results["scanned"] = results["scanned"] + 1
+			if scan_result["is_clean"] == 1 {
+				results["clean"] = results["clean"] + 1
+			} else {
+				results["dirty"] = results["dirty"] + 1
+			}
 		} else {
 			results["errors"] = results["errors"] + 1
 		}
@@ -448,7 +465,7 @@ export func api_bulk_scan(req) {
 	}
 
 	// Update scan run record
-	db_execute(db, "UPDATE scan_runs SET completed_at = datetime('now'), success_count = " + to_string(results["scanned"]) + ", error_count = " + to_string(results["errors"]) + " WHERE id = " + to_string(run_id))
+	db_execute(db, "UPDATE scan_runs SET completed_at = datetime('now'), success_count = " + to_string(results["scanned"]) + ", error_count = " + to_string(results["errors"]) + ", clean_count = " + to_string(results["clean"]) + ", dirty_count = " + to_string(results["dirty"]) + " WHERE id = " + to_string(run_id))
 
 	return add_cors(json_response(200, results))
 }
@@ -471,8 +488,17 @@ export func api_discover(req) {
 		return add_cors(json_response(400, {"success": false, "error": "Parent path is required"}))
 	}
 
-	mut max_depth = get_default(data, "max_depth", 3)
-	mut include_hidden = get_default(data, "include_hidden", 0)
+	mut max_depth = parse_int(to_string(get_default(data, "max_depth", 3)))
+	mut include_hidden = parse_int(to_string(get_default(data, "include_hidden", 0)))
+	if max_depth < 1 {
+		max_depth = 3
+	}
+	if max_depth > 10 {
+		max_depth = 10
+	}
+	if include_hidden != 1 {
+		include_hidden = 0
+	}
 
 	mut db = init_db()
 	mut ignored_str = get_setting(db, "ignored_folders", "node_modules,vendor,.cache,dist,build,.git")
@@ -541,12 +567,12 @@ export func discover_repos(parent_path, max_depth, include_hidden, ignored_folde
 			}
 		}
 
-		if should_skip == 1 {
+		if should_skip == 1 && entry != ".git" {
 			continue
 		}
 
 		// Skip hidden folders unless included
-		if include_hidden == 0 && starts_with(entry, ".") == 1 && entry != ".git" {
+		if include_hidden == 0 && starts_with(entry, ".") && entry != ".git" {
 			continue
 		}
 
@@ -696,6 +722,11 @@ export func api_export(req) {
 		"repos": repos
 	}
 
+	mut exported_rows = db_query(db, "SELECT datetime('now') as exported_at")
+	if len(exported_rows) > 0 {
+		export_data["exported_at"] = exported_rows[0]["exported_at"]
+	}
+
 	mut resp = add_cors(json_response(200, export_data))
 	resp = set_header(resp, "Content-Disposition", "attachment; filename=\"reporadar-export.json\"")
 	return resp
@@ -745,7 +776,7 @@ export func api_import(req) {
 		}
 
 		// Check if path already tracked
-		mut existing = db_query(db, "SELECT id FROM repos WHERE path = '" + replace_str(path, "'", "''") + "'")
+		mut existing = db_query(db, "SELECT id FROM repos WHERE path = '" + escape_sql(path) + "'")
 		if len(existing) > 0 {
 			results["skipped"] = results["skipped"] + 1
 			continue
@@ -809,13 +840,13 @@ export func api_export_db(req) {
 
 /// get_mime_type returns the MIME type for a file extension.
 export func get_mime_type(filename) {
-	if ends_with(filename, ".html") == 1 { return "text/html" }
-	if ends_with(filename, ".css") == 1 { return "text/css" }
-	if ends_with(filename, ".js") == 1 { return "application/javascript" }
-	if ends_with(filename, ".json") == 1 { return "application/json" }
-	if ends_with(filename, ".svg") == 1 { return "image/svg+xml" }
-	if ends_with(filename, ".png") == 1 { return "image/png" }
-	if ends_with(filename, ".ico") == 1 { return "image/x-icon" }
+	if ends_with(filename, ".html") { return "text/html" }
+	if ends_with(filename, ".css") { return "text/css" }
+	if ends_with(filename, ".js") { return "application/javascript" }
+	if ends_with(filename, ".json") { return "application/json" }
+	if ends_with(filename, ".svg") { return "image/svg+xml" }
+	if ends_with(filename, ".png") { return "image/png" }
+	if ends_with(filename, ".ico") { return "image/x-icon" }
 	return "application/octet-stream"
 }
 
@@ -836,7 +867,7 @@ export func serve_static(req) {
 	}
 
 	// Remove leading slash if present
-	if starts_with(file_path, "/") == 1 {
+	if starts_with(file_path, "/") {
 		file_path = substring(file_path, 1, len(file_path))
 	}
 
@@ -864,9 +895,19 @@ export func serve_static(req) {
 
 /// setup_routes configures all API and static routes on the server.
 export func setup_routes(server) {
-	// Static file serving - catch-all for non-API paths
+	// Static file serving — register each file the dashboard needs
 	server = server.route("GET", "/", serve_static)
-	server = server.route("GET", "/static/*", serve_static)
+	server = server.route("GET", "/index.html", serve_static)
+	server = server.route("GET", "/style.css", serve_static)
+	server = server.route("GET", "/app.js", serve_static)
+	server = server.route("GET", "/detail.html", serve_static)
+	server = server.route("GET", "/detail.js", serve_static)
+	server = server.route("GET", "/activity.html", serve_static)
+	server = server.route("GET", "/activity.js", serve_static)
+	server = server.route("GET", "/discovery.html", serve_static)
+	server = server.route("GET", "/discovery.js", serve_static)
+	server = server.route("GET", "/settings.html", serve_static)
+	server = server.route("GET", "/settings.js", serve_static)
 
 	// API routes
 	server = server.route("GET", "/api/repos", api_list_repos)

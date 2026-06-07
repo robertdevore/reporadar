@@ -187,9 +187,16 @@ export func cmd_export() {
 		i = i + 1
 	}
 
+	mut exported_rows = db_query(db, "SELECT datetime('now') as exported_at")
+	mut exported_at = ""
+	if len(exported_rows) > 0 {
+		exported_at = exported_rows[0]["exported_at"]
+	}
+
 	mut export_data = {
 		"app": "reporadar",
 		"version": "0.1.0",
+		"exported_at": exported_at,
 		"settings": settings,
 		"repos": repos
 	}
@@ -219,6 +226,10 @@ export func main() {
 
 	if cmd == "serve" {
 		mut port = parse_int(cmd_arg)
+		if port <= 0 || port > 65535 {
+			print("Error: port must be between 1 and 65535")
+			return
+		}
 		start_server(port)
 		return
 	}
@@ -234,11 +245,19 @@ export func main() {
 	}
 
 	if cmd == "remove" {
+		if parse_int(cmd_arg) <= 0 {
+			print("Error: repo ID must be a positive number")
+			return
+		}
 		cmd_remove(cmd_arg)
 		return
 	}
 
 	if cmd == "scan" {
+		if parse_int(cmd_arg) <= 0 {
+			print("Error: repo ID must be a positive number")
+			return
+		}
 		cmd_scan(cmd_arg)
 		return
 	}

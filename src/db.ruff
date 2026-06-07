@@ -2,11 +2,64 @@
 // Handles SQLite schema creation, migrations, and query helpers.
 
 /// get_db_path returns the path to the SQLite database file.
-/// Uses REPORADAR_DB env var if set, otherwise defaults to reporadar.db in the current directory.
+/// Uses REPORADAR_DB env var if set, otherwise defaults to ~/.reporadar.db.
 export func get_db_path() {
 	mut home = env_or("HOME", ".")
 	mut db_path = env_or("REPORADAR_DB", join_path(home, ".reporadar.db"))
 	return db_path
+}
+
+/// escape_sql safely escapes a value for single-quoted SQL literals.
+export func escape_sql(value) {
+	if value == null {
+		return ""
+	}
+	return replace_str(to_string(value), "'", "''")
+}
+
+/// sanitize_setting_value normalizes built-in settings before storage.
+export func sanitize_setting_value(key, value) {
+	mut string_value = to_string(value)
+
+	if key == "stale_threshold_days" || key == "default_activity_window" {
+		mut parsed = parse_int(string_value)
+		if parsed <= 0 {
+			if key == "stale_threshold_days" {
+				return "14"
+			}
+			return "7"
+		}
+		if parsed > 365 {
+			parsed = 365
+		}
+		return to_string(parsed)
+	}
+
+	if key == "enable_write_actions" {
+		if string_value == "true" {
+			return "true"
+		}
+		return "false"
+	}
+
+	if key == "ignored_folders" {
+		if trim(string_value) == "" {
+			return "node_modules,vendor,.cache,dist,build,.git"
+		}
+	}
+
+	return string_value
+}
+
+/// create_indexes adds performance-oriented indexes used by dashboard queries.
+export func create_indexes(db) {
+	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_repos_archived_pinned_name ON repos (archived, pinned DESC, name ASC)")
+	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_repo_status_snapshots_repo_scanned_at ON repo_status_snapshots (repo_id, scanned_at DESC)")
+	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_repo_file_changes_snapshot_id ON repo_file_changes (snapshot_id)")
+	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_repo_commits_repo_date ON repo_commits (repo_id, date DESC)")
+	db_execute(db, "DELETE FROM repo_commits WHERE id NOT IN (SELECT MIN(id) FROM repo_commits GROUP BY repo_id, commit_hash)")
+	db_execute(db, "CREATE UNIQUE INDEX IF NOT EXISTS idx_repo_commits_repo_hash ON repo_commits (repo_id, commit_hash)")
+	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_scan_runs_completed_at ON scan_runs (completed_at DESC)")
 }
 
 /// init_db creates/opens the database and ensures the schema is up to date.
@@ -49,6 +102,8 @@ export func create_schema(db) {
 	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('enable_write_actions', 'false')")
 	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('default_sort_column', 'name')")
 	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('default_sort_order', 'asc')")
+
+	create_indexes(db)
 
 	// Record schema version
 	db_execute(db, "INSERT INTO schema_version (version) VALUES (1)")
@@ -94,6 +149,8 @@ export func ensure_schema(db) {
 	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('default_sort_column', 'name')")
 	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('default_sort_order', 'asc')")
 
+	create_indexes(db)
+
 	if current_version < 1 {
 		db_execute(db, "INSERT INTO schema_version (version) VALUES (1)")
 	}
@@ -101,7 +158,10 @@ export func ensure_schema(db) {
 
 /// get_setting retrieves a setting value by key, with an optional default.
 export func get_setting(db, key, default_value) {
-	mut rows = db_query(db, "SELECT value FROM settings WHERE key = '" + key + "'")
+	if key == null {
+		return default_value
+	}
+	mut rows = db_query(db, "SELECT value FROM settings WHERE key = '" + escape_sql(key) + "'")
 	if len(rows) > 0 {
 		return rows[0]["value"]
 	}
@@ -110,10 +170,15 @@ export func get_setting(db, key, default_value) {
 
 /// set_setting updates or inserts a setting.
 export func set_setting(db, key, value) {
-	mut rows = db_query(db, "SELECT key FROM settings WHERE key = '" + key + "'")
+	if key == null {
+		return
+	}
+	mut safe_key = escape_sql(key)
+	mut safe_value = escape_sql(sanitize_setting_value(key, value))
+	mut rows = db_query(db, "SELECT key FROM settings WHERE key = '" + safe_key + "'")
 	if len(rows) > 0 {
-		db_execute(db, "UPDATE settings SET value = '" + value + "' WHERE key = '" + key + "'")
+		db_execute(db, "UPDATE settings SET value = '" + safe_value + "' WHERE key = '" + safe_key + "'")
 	} else {
-		db_execute(db, "INSERT INTO settings (key, value) VALUES ('" + key + "', '" + value + "')")
+		db_execute(db, "INSERT INTO settings (key, value) VALUES ('" + safe_key + "', '" + safe_value + "')")
 	}
 }

@@ -1,5 +1,6 @@
 // registry.ruff — RepoRadar Repo Registry CRUD Operations
 
+from src.db import escape_sql
 from src.scanner import validate_repo_path, validate_git_repo, get_canonical_path
 
 /// add_repo validates and adds a repo to the registry.
@@ -25,7 +26,7 @@ export func add_repo(db, path, display_name, group_name, tags, notes, pinned) {
 	mut canonical = get_canonical_path(path)
 
 	// Check for duplicate path
-	mut existing = db_query(db, "SELECT id FROM repos WHERE path = '" + replace_str(canonical, "'", "''") + "'")
+	mut existing = db_query(db, "SELECT id FROM repos WHERE path = '" + escape_sql(canonical) + "'")
 	if len(existing) > 0 {
 		return {"success": false, "error": "Repository already tracked at: " + canonical}
 	}
@@ -35,11 +36,11 @@ export func add_repo(db, path, display_name, group_name, tags, notes, pinned) {
 		display_name = basename(canonical)
 	}
 
-	mut safe_name = replace_str(display_name, "'", "''")
-	mut safe_path = replace_str(canonical, "'", "''")
-	mut safe_group = replace_str(group_name, "'", "''")
-	mut safe_tags = replace_str(tags, "'", "''")
-	mut safe_notes = replace_str(notes, "'", "''")
+	mut safe_name = escape_sql(display_name)
+	mut safe_path = escape_sql(canonical)
+	mut safe_group = escape_sql(group_name)
+	mut safe_tags = escape_sql(tags)
+	mut safe_notes = escape_sql(notes)
 
 	db_execute(db, "INSERT INTO repos (name, display_name, path, group_name, tags, notes, pinned) VALUES ('" + safe_name + "', '" + safe_name + "', '" + safe_path + "', '" + safe_group + "', '" + safe_tags + "', '" + safe_notes + "', " + to_string(pinned) + ")")
 
@@ -72,16 +73,16 @@ export func update_repo(db, repo_id, display_name, group_name, tags, notes, pinn
 
 	mut updates = []
 	if display_name != null {
-		updates = push(updates, "display_name = '" + replace_str(display_name, "'", "''") + "'")
+		updates = push(updates, "display_name = '" + escape_sql(display_name) + "'")
 	}
 	if group_name != null {
-		updates = push(updates, "group_name = '" + replace_str(group_name, "'", "''") + "'")
+		updates = push(updates, "group_name = '" + escape_sql(group_name) + "'")
 	}
 	if tags != null {
-		updates = push(updates, "tags = '" + replace_str(tags, "'", "''") + "'")
+		updates = push(updates, "tags = '" + escape_sql(tags) + "'")
 	}
 	if notes != null {
-		updates = push(updates, "notes = '" + replace_str(notes, "'", "''") + "'")
+		updates = push(updates, "notes = '" + escape_sql(notes) + "'")
 	}
 	if pinned != null {
 		updates = push(updates, "pinned = " + to_string(pinned))
@@ -119,15 +120,15 @@ export func get_repo_by_id(db, repo_id) {
 
 /// store_scan_result saves a scan result to the database.
 export func store_scan_result(db, repo_id, scan_data) {
-	mut safe_branch = replace_str(scan_data["branch"], "'", "''")
-	mut safe_remote = replace_str(scan_data["remote_url"], "'", "''")
-	mut safe_upstream = replace_str(scan_data["upstream_branch"], "'", "''")
-	mut safe_hash = replace_str(scan_data["latest_commit_hash"], "'", "''")
-	mut safe_short = replace_str(scan_data["latest_commit_short_hash"], "'", "''")
-	mut safe_msg = replace_str(scan_data["latest_commit_message"], "'", "''")
-	mut safe_author = replace_str(scan_data["latest_commit_author"], "'", "''")
-	mut safe_date = replace_str(scan_data["latest_commit_date"], "'", "''")
-	mut safe_error = replace_str(scan_data["error"], "'", "''")
+	mut safe_branch = escape_sql(scan_data["branch"])
+	mut safe_remote = escape_sql(scan_data["remote_url"])
+	mut safe_upstream = escape_sql(scan_data["upstream_branch"])
+	mut safe_hash = escape_sql(scan_data["latest_commit_hash"])
+	mut safe_short = escape_sql(scan_data["latest_commit_short_hash"])
+	mut safe_msg = escape_sql(scan_data["latest_commit_message"])
+	mut safe_author = escape_sql(scan_data["latest_commit_author"])
+	mut safe_date = escape_sql(scan_data["latest_commit_date"])
+	mut safe_error = escape_sql(scan_data["error"])
 
 	mut sql = "INSERT INTO repo_status_snapshots (repo_id, branch, remote_url, upstream_branch, latest_commit_hash, latest_commit_short_hash, latest_commit_message, latest_commit_author, latest_commit_date, is_clean, staged_count, unstaged_count, untracked_count, changed_total, ahead_count, behind_count, is_diverged, is_detached, has_remote, scan_error) VALUES (" + to_string(repo_id) + ", '" + safe_branch + "', '" + safe_remote + "', '" + safe_upstream + "', '" + safe_hash + "', '" + safe_short + "', '" + safe_msg + "', '" + safe_author + "', '" + safe_date + "', " + to_string(scan_data["is_clean"]) + ", " + to_string(scan_data["staged_count"]) + ", " + to_string(scan_data["unstaged_count"]) + ", " + to_string(scan_data["untracked_count"]) + ", " + to_string(scan_data["changed_total"]) + ", " + to_string(scan_data["ahead_count"]) + ", " + to_string(scan_data["behind_count"]) + ", " + to_string(scan_data["is_diverged"]) + ", " + to_string(scan_data["is_detached"]) + ", " + to_string(scan_data["has_remote"]) + ", '" + safe_error + "')"
 
@@ -146,9 +147,9 @@ export func store_scan_result(db, repo_id, scan_data) {
 		while fi < len(file_changes) {
 			mut fc = file_changes[fi]
 			fi = fi + 1
-			mut safe_file = replace_str(fc["file_path"], "'", "''")
-			mut safe_code = replace_str(fc["status_code"], "'", "''")
-			mut safe_label = replace_str(fc["status_label"], "'", "''")
+			mut safe_file = escape_sql(fc["file_path"])
+			mut safe_code = escape_sql(fc["status_code"])
+			mut safe_label = escape_sql(fc["status_label"])
 			db_execute(db, "INSERT INTO repo_file_changes (repo_id, snapshot_id, file_path, status_code, status_label, staged, unstaged, untracked) VALUES (" + to_string(repo_id) + ", " + to_string(snapshot_id) + ", '" + safe_file + "', '" + safe_code + "', '" + safe_label + "', " + to_string(fc["staged"]) + ", " + to_string(fc["unstaged"]) + ", " + to_string(fc["untracked"]) + ")")
 		}
 	}
@@ -161,7 +162,7 @@ export func store_scan_result(db, repo_id, scan_data) {
 
 /// get_repo_file_changes returns file changes for a repo's latest snapshot.
 export func get_repo_file_changes(db, repo_id) {
-	mut query = "SELECT fc.* FROM repo_file_changes fc INNER JOIN repo_status_snapshots s ON fc.snapshot_id = s.id WHERE fc.repo_id = " + to_string(repo_id) + " ORDER BY s.scanned_at DESC, fc.file_path ASC"
+	mut query = "SELECT fc.* FROM repo_file_changes fc WHERE fc.snapshot_id = (SELECT id FROM repo_status_snapshots WHERE repo_id = " + to_string(repo_id) + " ORDER BY scanned_at DESC, id DESC LIMIT 1) ORDER BY fc.file_path ASC"
 	return db_query(db, query)
 }
 
@@ -178,16 +179,13 @@ export func store_repo_commits(db, repo_id, commits) {
 		mut c = commits[i]
 		i = i + 1
 
-		mut safe_hash = replace_str(c["hash"], "'", "''")
-		mut safe_short = replace_str(c["short_hash"], "'", "''")
-		mut safe_author = replace_str(c["author"], "'", "''")
-		mut safe_date = replace_str(c["date"], "'", "''")
-		mut safe_msg = replace_str(c["message"], "'", "''")
+		mut safe_hash = escape_sql(c["hash"])
+		mut safe_short = escape_sql(c["short_hash"])
+		mut safe_author = escape_sql(c["author"])
+		mut safe_date = escape_sql(c["date"])
+		mut safe_msg = escape_sql(c["message"])
 
-		mut existing = db_query(db, "SELECT id FROM repo_commits WHERE repo_id = " + to_string(repo_id) + " AND commit_hash = '" + safe_hash + "'")
-		if len(existing) == 0 {
-			db_execute(db, "INSERT INTO repo_commits (repo_id, commit_hash, short_hash, author, date, message) VALUES (" + to_string(repo_id) + ", '" + safe_hash + "', '" + safe_short + "', '" + safe_author + "', '" + safe_date + "', '" + safe_msg + "')")
-		}
+		db_execute(db, "INSERT OR IGNORE INTO repo_commits (repo_id, commit_hash, short_hash, author, date, message) VALUES (" + to_string(repo_id) + ", '" + safe_hash + "', '" + safe_short + "', '" + safe_author + "', '" + safe_date + "', '" + safe_msg + "')")
 	}
 }
 

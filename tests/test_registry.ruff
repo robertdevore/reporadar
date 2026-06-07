@@ -1,8 +1,8 @@
 // RepoRadar Registry & Database Tests
 // Run: ruff test-run tests/test_registry.ruff
 
-from src.db import init_db, get_setting, set_setting
-from src.registry import add_repo, remove_repo, update_repo, get_all_repos, get_repo_by_id
+from src.db import init_db, get_setting, set_setting, sanitize_setting_value
+from src.registry import add_repo, remove_repo, update_repo, get_all_repos, get_repo_by_id, get_repo_file_changes, store_repo_commits
 
 // === Database Tests ===
 
@@ -29,12 +29,37 @@ test_group "Database — init and settings" {
 		assert_equal(result, "test_value")
 	}
 
+	test "setting values with quotes survive roundtrip" {
+		let db = db_connect("sqlite", ":memory:")
+		db_execute(db, "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+
+		set_setting(db, "author_name", "O'Reilly")
+		let result = get_setting(db, "author_name", "default")
+		assert_equal(result, "O'Reilly")
+	}
+
+	test "numeric settings are normalized before storage" {
+		let db = db_connect("sqlite", ":memory:")
+		db_execute(db, "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+
+		set_setting(db, "stale_threshold_days", "-12")
+		set_setting(db, "default_activity_window", "999")
+		assert_equal(get_setting(db, "stale_threshold_days", "0"), "14")
+		assert_equal(get_setting(db, "default_activity_window", "0"), "365")
+	}
+
 	test "get_setting returns default when key missing" {
 		let db = db_connect("sqlite", ":memory:")
 		db_execute(db, "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
 		
 		let result = get_setting(db, "missing_key", "fallback")
 		assert_equal(result, "fallback")
+	}
+
+	test "sanitize_setting_value handles unsafe defaults" {
+		assert_equal(sanitize_setting_value("enable_write_actions", "true"), "true")
+		assert_equal(sanitize_setting_value("enable_write_actions", "yes"), "false")
+		assert_equal(sanitize_setting_value("ignored_folders", "   "), "node_modules,vendor,.cache,dist,build,.git")
 	}
 }
 
@@ -104,5 +129,41 @@ test_group "Registry — update repo metadata" {
 		
 		let result = update_repo(db, 999, "Test", null, null, null, null, null)
 		assert_false(result["success"])
+	}
+}
+
+test_group "Registry — scan data helpers" {
+	test "get_repo_file_changes returns latest snapshot only" {
+		let db = db_connect("sqlite", ":memory:")
+		db_execute(db, "CREATE TABLE repos (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_name TEXT, path TEXT NOT NULL UNIQUE, group_name TEXT DEFAULT '', tags TEXT DEFAULT '', notes TEXT DEFAULT '', pinned INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), last_scan_at TEXT, last_error TEXT)")
+		db_execute(db, "CREATE TABLE repo_status_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, scanned_at TEXT NOT NULL DEFAULT (datetime('now')), branch TEXT, remote_url TEXT, upstream_branch TEXT, latest_commit_hash TEXT, latest_commit_short_hash TEXT, latest_commit_message TEXT, latest_commit_author TEXT, latest_commit_date TEXT, is_clean INTEGER DEFAULT 0, staged_count INTEGER DEFAULT 0, unstaged_count INTEGER DEFAULT 0, untracked_count INTEGER DEFAULT 0, changed_total INTEGER DEFAULT 0, ahead_count INTEGER DEFAULT 0, behind_count INTEGER DEFAULT 0, is_diverged INTEGER DEFAULT 0, is_detached INTEGER DEFAULT 0, has_remote INTEGER DEFAULT 0, scan_error TEXT)")
+		db_execute(db, "CREATE TABLE repo_file_changes (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, snapshot_id INTEGER NOT NULL, file_path TEXT NOT NULL, status_code TEXT NOT NULL, status_label TEXT NOT NULL, staged INTEGER DEFAULT 0, unstaged INTEGER DEFAULT 0, untracked INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')))")
+		db_execute(db, "INSERT INTO repos (name, path) VALUES ('repo', '/fake/path')")
+		db_execute(db, "INSERT INTO repo_status_snapshots (repo_id, scanned_at) VALUES (1, '2024-01-01T00:00:00')")
+		db_execute(db, "INSERT INTO repo_status_snapshots (repo_id, scanned_at) VALUES (1, '2024-02-01T00:00:00')")
+		db_execute(db, "INSERT INTO repo_file_changes (repo_id, snapshot_id, file_path, status_code, status_label) VALUES (1, 1, 'old.txt', 'M ', 'modified')")
+		db_execute(db, "INSERT INTO repo_file_changes (repo_id, snapshot_id, file_path, status_code, status_label) VALUES (1, 2, 'new.txt', 'M ', 'modified')")
+
+		let changes = get_repo_file_changes(db, 1)
+		assert_equal(len(changes), 1)
+		assert_equal(changes[0]["file_path"], "new.txt")
+	}
+
+	test "store_repo_commits ignores duplicate hashes" {
+		let db = db_connect("sqlite", ":memory:")
+		db_execute(db, "CREATE TABLE repo_commits (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, commit_hash TEXT NOT NULL, short_hash TEXT NOT NULL, author TEXT NOT NULL, date TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))")
+		db_execute(db, "CREATE UNIQUE INDEX idx_repo_commits_repo_hash ON repo_commits (repo_id, commit_hash)")
+
+		let commits = [
+			{"hash": "abc123", "short_hash": "abc123", "author": "A", "date": "2024-01-01", "message": "one"},
+			{"hash": "abc123", "short_hash": "abc123", "author": "A", "date": "2024-01-01", "message": "one"},
+			{"hash": "def456", "short_hash": "def456", "author": "B", "date": "2024-01-02", "message": "two"}
+		]
+
+		store_repo_commits(db, 1, commits)
+		let rows = db_query(db, "SELECT * FROM repo_commits ORDER BY commit_hash ASC")
+		assert_equal(len(rows), 2)
+		assert_equal(rows[0]["commit_hash"], "abc123")
+		assert_equal(rows[1]["commit_hash"], "def456")
 	}
 }
