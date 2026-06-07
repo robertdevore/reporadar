@@ -9,11 +9,14 @@ let currentFilter = 'all';
 
 // === Init ===
 document.addEventListener('DOMContentLoaded', () => {
-  loadRepos();
-  loadSummary();
-  loadGroups();
   setupEventListeners();
+  initPage();
 });
+
+async function initPage() {
+  await Promise.all([loadRepos(), loadSummary()]);
+  loadGroups();
+}
 
 // === Event Listeners ===
 function setupEventListeners() {
@@ -72,6 +75,8 @@ async function loadRepos() {
   } catch (err) {
     document.getElementById('loading-state').classList.add('hidden');
     document.getElementById('error-state').classList.remove('hidden');
+    document.getElementById('error-state').querySelector('p').textContent =
+      'We could not load repository data. Check that the local server is running and try again.';
   }
 }
 
@@ -87,6 +92,7 @@ async function loadSummary() {
     document.getElementById('sum-diverged').textContent = s.diverged || 0;
     document.getElementById('sum-noremote').textContent = s.no_remote || 0;
     document.getElementById('sum-errors').textContent = s.errors || 0;
+    document.getElementById('sum-stale').textContent = s.stale || 0;
   } catch (err) {
     // Silently fail
   }
@@ -219,6 +225,11 @@ async function startBulkScan() {
     showToast('No repos to scan', 'error');
     return;
   }
+
+  const scanButton = document.getElementById('btn-scan-all');
+  scanButton.disabled = true;
+  scanButton.innerHTML = '<span style="margin-right:6px;">⏳</span> Scanning...';
+
   openModal('modal-scan');
   document.getElementById('progress-bar').style.width = '0%';
   document.getElementById('scan-current').textContent = 'Starting scan...';
@@ -229,7 +240,7 @@ async function startBulkScan() {
     document.getElementById('progress-bar').style.width = '100%';
     document.getElementById('scan-current').textContent = 'Scan complete!';
     document.getElementById('scan-stats').textContent =
-      result.scanned + ' scanned, ' + result.errors + ' errors out of ' + result.total + ' repos';
+      result.scanned + ' scanned, ' + (result.clean || 0) + ' clean, ' + (result.dirty || 0) + ' dirty, ' + result.errors + ' errors out of ' + result.total + ' repos';
 
     setTimeout(() => {
       closeModal('modal-scan');
@@ -239,6 +250,9 @@ async function startBulkScan() {
   } catch (err) {
     document.getElementById('scan-current').textContent = 'Scan failed';
     document.getElementById('scan-stats').textContent = 'Server connection error';
+  } finally {
+    scanButton.disabled = false;
+    scanButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg> Scan All';
   }
 }
 
@@ -288,7 +302,17 @@ function renderTable() {
 
   // Render rows
   const tbody = document.getElementById('repo-tbody');
-  tbody.innerHTML = repos.map(r => renderRow(r)).join('');
+  if (repos.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="14" style="text-align:center;padding:32px;color:var(--text-muted);">
+          No repositories match the current filters.
+        </td>
+      </tr>
+    `;
+  } else {
+    tbody.innerHTML = repos.map(r => renderRow(r)).join('');
+  }
 
   // Update counts
   currentFilter = statusFilter;
@@ -387,9 +411,9 @@ function renderRow(repo) {
       <td title="${repo.latest_commit_message || ''}">${commitDate}</td>
       <td>${scanDate}</td>
       <td class="action-cell">
-        <button class="btn btn-sm btn-secondary" onclick="scanRepo(${repo.id})" title="Scan">🔄</button>
-        <button class="btn btn-sm btn-secondary" onclick="openEditModal(${JSON.stringify(repo).replace(/"/g, '&quot;')})" title="Edit">✏</button>
-        <button class="btn btn-sm btn-secondary" onclick="removeRepo(${repo.id}, '${escHtml(name).replace(/'/g, "\\'")}')" title="Remove">🗑</button>
+        <button class="btn btn-sm btn-secondary" onclick="scanRepo(${repo.id})" title="Scan"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
+        <button class="btn btn-sm btn-secondary" onclick="openEditModal(${JSON.stringify(repo).replace(/"/g, '&quot;')})" title="Edit"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 21h8"/><path d="m15 5 4 4"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg></button>
+        <button class="btn btn-sm btn-secondary" onclick="removeRepo(${repo.id}, '${escHtml(name).replace(/'/g, "\\'")}')" title="Remove"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
       </td>
     </tr>
   `;

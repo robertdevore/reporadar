@@ -2,6 +2,7 @@
 
 const urlParams = new URLSearchParams(window.location.search);
 const repoId = urlParams.get('id');
+let currentRepo = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   if (!repoId) {
@@ -36,6 +37,7 @@ async function loadDetail() {
 
 function renderDetail(data) {
   const repo = data.repo;
+  currentRepo = repo;
   const fileChanges = data.file_changes || [];
   const commits = data.recent_commits || [];
   const scanHistory = data.scan_history || [];
@@ -80,7 +82,7 @@ function renderDetail(data) {
   if (commits.length > 0) {
     commitSection = `
       <div class="card card-full">
-        <h3>📝 Recent Commits (${commits.length})</h3>
+        <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="3"/><line x1="3" x2="9" y1="12" y2="12"/><line x1="15" x2="21" y1="12" y2="12"/></svg> Recent Commits (${commits.length})</h3>
         <div class="commit-list">
           ${commits.slice(0, 20).map(c => `
             <div class="commit-item">
@@ -98,7 +100,7 @@ function renderDetail(data) {
   if (scanHistory.length > 0) {
     scanSection = `
       <div class="card card-full">
-        <h3>📊 Scan History</h3>
+        <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> Scan History</h3>
         ${scanHistory.slice(0, 5).map(s => `
           <div class="info-row">
             <span class="info-label">${s.scanned_at}</span>
@@ -112,7 +114,7 @@ function renderDetail(data) {
   const html = `
     <div class="detail-layout">
       <div class="card">
-        <h3>📋 Repository Info</h3>
+        <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg> Repository Info</h3>
         <div class="info-row"><span class="info-label">Name</span><span class="info-value">${escHtml(repo.display_name || repo.name)}${pinned}</span></div>
         <div class="info-row"><span class="info-label">Path</span><span class="info-value" style="font-family:monospace;font-size:12px;">${escHtml(repo.path)}</span></div>
         <div class="info-row"><span class="info-label">Group</span><span class="info-value">${escHtml(repo.group_name || '-')}</span></div>
@@ -120,14 +122,14 @@ function renderDetail(data) {
         <div class="info-row"><span class="info-label">Notes</span><span class="info-value">${escHtml(repo.notes || '-')}</span></div>
         <div class="info-row"><span class="info-label">Created</span><span class="info-value">${formatDate(repo.created_at)}</span></div>
         <div style="margin-top:12px;display:flex;gap:8px;">
-          <button class="btn btn-primary" onclick="rescanRepo()">🔄 Rescan</button>
-          <button class="btn btn-secondary" onclick="copyPath('${escHtml(repo.path).replace(/'/g, "\\'")}')">📋 Copy Path</button>
-          <button class="btn btn-secondary" onclick="copyStatusSummary()">📋 Copy Status</button>
+          <button class="btn btn-primary" onclick="rescanRepo()"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg> Rescan</button>
+          <button class="btn btn-secondary" onclick="copyPath('${escHtml(repo.path).replace(/'/g, "\\'")}')"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy Path</button>
+          <button class="btn btn-secondary" onclick="copyStatusSummary()"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="m12 15 2 2 4-4"/><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy Status</button>
         </div>
       </div>
 
       <div class="card">
-        <h3>🔍 Git Status</h3>
+        <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> Git Status</h3>
         <div class="info-row"><span class="info-label">Status</span><span class="info-value">${statusBadge}</span></div>
         <div class="info-row"><span class="info-label">Branch</span><span class="info-value">${escHtml(repo.branch || (repo.is_detached === 1 ? '(detached)' : '-'))}</span></div>
         <div class="info-row"><span class="info-label">Remote</span><span class="info-value" style="font-family:monospace;font-size:11px;">${escHtml(repo.remote_url || 'None')}</span></div>
@@ -142,7 +144,7 @@ function renderDetail(data) {
       </div>
 
       <div class="card">
-        <h3>💬 Latest Commit</h3>
+        <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="m10 9-3 3 3 3"/><path d="m14 15 3-3-3-3"/><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg> Latest Commit</h3>
         <div class="info-row"><span class="info-label">Hash</span><span class="info-value" style="font-family:monospace;font-size:12px;">${escHtml(repo.latest_commit_short_hash || '-')}</span></div>
         <div class="info-row"><span class="info-label">Message</span><span class="info-value">${escHtml(repo.latest_commit_message || '-')}</span></div>
         <div class="info-row"><span class="info-label">Author</span><span class="info-value">${escHtml(repo.latest_commit_author || '-')}</span></div>
@@ -150,7 +152,7 @@ function renderDetail(data) {
       </div>
 
       <div class="card">
-        <h3>⏱ Scan Info</h3>
+        <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M11 7v4"/><path d="M11 15h.01"/></svg> Scan Info</h3>
         <div class="info-row"><span class="info-label">Last Scan</span><span class="info-value">${repo.scanned_at ? formatDate(repo.scanned_at) : 'Never'}</span></div>
         <div class="info-row"><span class="info-label">Error</span><span class="info-value">${repo.scan_error ? escHtml(repo.scan_error) : 'None'}</span></div>
       </div>
@@ -193,8 +195,8 @@ async function copyPath(path) {
 
 async function copyStatusSummary() {
   try {
-    const data = await apiFetch('/api/repos/' + repoId);
-    const repo = data.repo;
+    if (!currentRepo) { showToast('No repo data loaded', 'error'); return; }
+    const repo = currentRepo;
     const summary = [
       'Repo: ' + (repo.display_name || repo.name),
       'Path: ' + repo.path,

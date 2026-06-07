@@ -1,5 +1,7 @@
 // RepoRadar — Discovery Page
 
+let lastDiscoveryData = null;
+
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-discover-start').addEventListener('click', startDiscovery);
   document.getElementById('btn-add-selected').addEventListener('click', addSelected);
@@ -23,6 +25,9 @@ async function startDiscovery() {
   document.getElementById('discover-loading').classList.remove('hidden');
   document.getElementById('discover-results').classList.add('hidden');
   document.getElementById('btn-add-selected').style.display = 'none';
+  document.getElementById('btn-add-selected').disabled = true;
+  document.getElementById('btn-discover-start').disabled = true;
+  document.getElementById('btn-discover-start').innerHTML = '⏳ Scanning...';
 
   try {
     const data = await apiFetch('/api/discover', {
@@ -33,6 +38,7 @@ async function startDiscovery() {
 
     document.getElementById('discover-loading').classList.add('hidden');
     document.getElementById('discover-results').classList.remove('hidden');
+    lastDiscoveryData = data;
 
     const newRepos = data.new_repos || [];
     document.getElementById('result-title').textContent =
@@ -42,13 +48,20 @@ async function startDiscovery() {
       document.getElementById('btn-add-selected').style.display = 'inline-flex';
       document.getElementById('select-all-row').style.display = 'block';
       renderResultList(newRepos);
+    } else if (data.total_found > 0) {
+      document.getElementById('result-list').innerHTML =
+        '<p style="color:var(--text-muted);padding:12px;">All ' + data.total_found + ' found repos are already tracked.</p>';
     } else {
       document.getElementById('result-list').innerHTML =
-        '<p style="color:var(--text-muted);padding:12px;">All found repos are already tracked.</p>';
+        '<p style="color:var(--text-muted);padding:12px;">No Git repositories found in this directory.</p>';
     }
   } catch (err) {
     document.getElementById('discover-loading').classList.add('hidden');
     showToast('Discovery failed: ' + err.message, 'error');
+  } finally {
+    document.getElementById('btn-discover-start').disabled = false;
+    document.getElementById('btn-discover-start').innerHTML = '🔍 Scan Directory';
+    document.getElementById('btn-add-selected').disabled = false;
   }
 }
 
@@ -77,21 +90,12 @@ async function addSelected() {
     return;
   }
 
-  // We need to get the repo data. Re-fetch discovery to get the list.
-  const path = document.getElementById('discover-path').value.trim();
-  let data;
-  try {
-    data = await apiFetch('/api/discover', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: path, max_depth: 4, include_hidden: 0 })
-    });
-  } catch (err) {
-    showToast('Failed to get repo list', 'error');
+  if (!lastDiscoveryData) {
+    showToast('Run discovery again before adding repos', 'error');
     return;
   }
 
-  const newRepos = data.new_repos || [];
+  const newRepos = lastDiscoveryData.new_repos || [];
   const selectedIndices = new Set();
   checkboxes.forEach(cb => selectedIndices.add(parseInt(cb.dataset.index)));
 
@@ -101,6 +105,7 @@ async function addSelected() {
   });
 
   try {
+    document.getElementById('btn-add-selected').disabled = true;
     const result = await apiFetch('/api/repos/bulk-add', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -112,8 +117,11 @@ async function addSelected() {
     document.getElementById('select-all-row').style.display = 'none';
     document.getElementById('result-list').innerHTML =
       '<p style="color:var(--accent-green);padding:12px;">✓ Added ' + result.added + ' repositories</p>';
+    lastDiscoveryData = null;
   } catch (err) {
     showToast('Failed to add repos: ' + err.message, 'error');
+  } finally {
+    document.getElementById('btn-add-selected').disabled = false;
   }
 }
 

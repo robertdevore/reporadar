@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function apiFetch(url, options = {}) {
   try {
     const resp = await fetch(url, options);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
     return await resp.json();
   } catch (err) { throw err; }
 }
