@@ -2,19 +2,19 @@
 
 ## Strategy
 
-RepoRadar uses Ruff's built-in testing framework (`ruff test`). Tests are organized in the `tests/` directory.
+RepoRadar uses Kujo's built-in testing framework (`kujo test`). Tests are organized in the `tests/` directory.
 
 ## Running Tests
 
 ```bash
 # Run all tests
-ruff test tests/
+kujo test tests/
 
 # Run specific test file
-ruff test tests/test_scanner.ruff
+kujo test tests/test_scanner.kujo
 
 # Run with verbose output
-ruff test tests/ -v
+kujo test tests/ -v
 ```
 
 ## Test Categories
@@ -56,7 +56,7 @@ Tests should use:
 
 ## Writing Tests
 
-```ruff
+```kujo
 // Example test
 test "parse_git_status clean repo" {
     let output = "## main"

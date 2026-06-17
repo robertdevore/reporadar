@@ -25,7 +25,7 @@
 - [ ] Advanced filtering (regex, date ranges)
 - [ ] Custom dashboard layouts
 - [ ] Plugin/extension system
-- [ ] Ruff LSP integration for repo-aware editing
+- [ ] Kujo LSP integration for repo-aware editing
 - [ ] Multi-monitor support
 
 ## Known Limitations
@@ -34,4 +34,4 @@
 - No multi-user support (single local user)
 - No cloud sync (by design)
 - Requires Git to be installed separately
-- Ruff v1.0.0+ required; may not work with older versions
+- Kujo v1.0.0+ required; may not work with older versions

@@ -2,10 +2,10 @@
 
 ## Overview
 
-RepoRadar is a **local-first** Git repository dashboard built in the **Ruff programming language**. It consists of:
+RepoRadar is a **local-first** Git repository dashboard built in the **Kujo programming language**. It consists of:
 
-1. **Ruff Backend** — CLI + HTTP server + Git scanner + SQLite storage
-2. **Static Frontend** — HTML/CSS/JS served by Ruff's built-in HTTP server
+1. **Kujo Backend** — CLI + HTTP server + Git scanner + SQLite storage
+2. **Static Frontend** — HTML/CSS/JS served by Kujo's built-in HTTP server
 3. **SQLite Database** — Local storage at `~/.reporadar.db`
 
 ## Component Diagram
@@ -18,16 +18,16 @@ RepoRadar is a **local-first** Git repository dashboard built in the **Ruff prog
 └──────────────────┬──────────────────────────────┘
                    │ HTTP (JSON API)
 ┌──────────────────▼──────────────────────────────┐
-│              Ruff HTTP Server                    │
+│              Kujo HTTP Server                    │
 │         (http_listen on 127.0.0.1)              │
 │                                                  │
 │  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │
 │  │  server  │  │ scanner  │  │   registry   │  │
-│  │  .ruff   │  │  .ruff   │  │    .ruff     │  │
+│  │  .kujo   │  │  .kujo   │  │    .kujo     │  │
 │  └────┬─────┘  └────┬─────┘  └──────┬───────┘  │
 │       │              │               │          │
 │  ┌────▼──────────────▼───────────────▼───────┐  │
-│  │              db.ruff (SQLite)             │  │
+│  │              db.kujo (SQLite)             │  │
 │  └──────────────────────────────────────────┘  │
 └──────────────────────┬──────────────────────────┘
                        │
@@ -40,7 +40,7 @@ RepoRadar is a **local-first** Git repository dashboard built in the **Ruff prog
 ## Data Flow
 
 1. User adds repo via CLI or API → validated as Git repo → stored in `repos` table
-2. Scan triggered → `scanner.ruff` runs safe Git commands → parses output → stored in `repo_status_snapshots`
+2. Scan triggered → `scanner.kujo` runs safe Git commands → parses output → stored in `repo_status_snapshots`
 3. Dashboard loads → API returns joined query of repos + latest snapshot → frontend renders
 4. Activity view → `git log --since` collects commits → stored in `repo_commits` → queried by time window
 

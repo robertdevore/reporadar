@@ -1,5 +1,5 @@
 // RepoRadar Scanner Unit Tests
-// Run: ruff test-run tests/test_scanner.ruff
+// Run: kujo test-run tests/test_scanner.kujo
 
 from src.scanner import parse_git_status, validate_repo_path, shell_quote
 

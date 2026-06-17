@@ -26,7 +26,7 @@
 - SQLite storage at `~/.reporadar.db` (configurable via env)
 - Server binds to `127.0.0.1` exclusively
 - Vanilla JS frontend with no framework dependencies
-- Ruff-first implementation using native builtins
+- Kujo-first implementation using native builtins
 
 ### SECURITY
 - Read-only Git commands only

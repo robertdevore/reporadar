@@ -1,4 +1,4 @@
-// db.ruff — RepoRadar Database Layer
+// db.kujo — RepoRadar Database Layer
 // Handles SQLite schema creation, migrations, and query helpers.
 
 /// get_db_path returns the path to the SQLite database file.

@@ -2,22 +2,22 @@
 
 ## Prerequisites
 
-- **Ruff v1.0.0+** — The Ruff programming language runtime
+- **Kujo v1.0.0+** — The Kujo programming language runtime
 - **Git** — Must be installed and accessible in your PATH
 - **macOS, Linux, or WSL** — Any Unix-like environment
 
-## Install Ruff
+## Install Kujo
 
 Build from source or use a pre-built binary:
 
 ```bash
-# From the Ruff project directory
-cd /path/to/ruff
+# From the Kujo project directory
+cd /path/to/kujo
 cargo build --release
-# Binary is at target/release/ruff
+# Binary is at target/release/kujo
 ```
 
-Add the Ruff binary to your PATH, or use the full path when running commands.
+Add the Kujo binary to your PATH, or use the full path when running commands.
 
 ## Install RepoRadar
 
@@ -25,11 +25,11 @@ Add the Ruff binary to your PATH, or use the full path when running commands.
 # Clone or copy the reporadar directory
 cd /path/to/reporadar
 
-# Verify Ruff is available
-ruff --version
+# Verify Kujo is available
+kujo --version
 
 # Start the server
-ruff run src/main.ruff serve 8080
+kujo run src/main.kujo serve 8080
 ```
 
 ## Configuration

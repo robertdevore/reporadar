@@ -1,5 +1,5 @@
 // RepoRadar Registry & Database Tests
-// Run: ruff test-run tests/test_registry.ruff
+// Run: kujo test-run tests/test_registry.kujo
 
 from src.db import init_db, get_setting, set_setting, sanitize_setting_value
 from src.registry import add_repo, remove_repo, update_repo, get_all_repos, get_repo_by_id, get_repo_file_changes, store_repo_commits

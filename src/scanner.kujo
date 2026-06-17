@@ -1,4 +1,4 @@
-// scanner.ruff — RepoRadar Git Scanner
+// scanner.kujo — RepoRadar Git Scanner
 // Runs safe read-only Git commands and parses their output.
 
 /// validate_git_repo checks if a path is a valid Git repository.

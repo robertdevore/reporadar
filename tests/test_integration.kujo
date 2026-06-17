@@ -1,5 +1,5 @@
 // RepoRadar Integration Tests
-// Run: ruff test-run tests/test_integration.ruff
+// Run: kujo test-run tests/test_integration.kujo
 // Requires: a real git repo at the path specified below
 
 from src.scanner import validate_git_repo, scan_repo, collect_recent_commits, get_canonical_path

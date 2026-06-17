@@ -5,13 +5,13 @@
 ```
 reporadar/
   README.md         # Top-level project overview
-  ruff.toml           # Project configuration
+  kujo.toml           # Project configuration
   src/
-    main.ruff         # CLI entry point
-    server.ruff       # HTTP server + API routes
-    db.ruff           # Database layer (SQLite)
-    scanner.ruff      # Git scanner
-    registry.ruff     # Repo registry CRUD
+    main.kujo         # CLI entry point
+    server.kujo       # HTTP server + API routes
+    db.kujo           # Database layer (SQLite)
+    scanner.kujo      # Git scanner
+    registry.kujo     # Repo registry CRUD
   static/
     index.html        # Main dashboard
     app.js            # Dashboard frontend
@@ -33,23 +33,23 @@ reporadar/
 
 ```bash
 # Check all source files
-ruff check src/*.ruff
+kujo check src/*.kujo
 
 # Start the server (foreground)
-ruff run src/main.ruff serve 8080
+kujo run src/main.kujo serve 8080
 
 # CLI commands
-ruff run src/main.ruff help
-ruff run src/main.ruff add /path/to/repo
-ruff run src/main.ruff list
-ruff run src/main.ruff scan <id>
-ruff run src/main.ruff scan-all
+kujo run src/main.kujo help
+kujo run src/main.kujo add /path/to/repo
+kujo run src/main.kujo list
+kujo run src/main.kujo scan <id>
+kujo run src/main.kujo scan-all
 ```
 
-## Ruff Conventions
+## Kujo Conventions
 
 - Use `export func` for all function declarations (required for cross-module visibility)
-- Use `mut` for mutable bindings (Ruff's `let` is deeply immutable)
+- Use `mut` for mutable bindings (Kujo's `let` is deeply immutable)
 - Use `from src.module import func` for cross-module imports
 - No multi-line strings — use single-line concatenation
 - `try/except err` requires a variable name after `except`

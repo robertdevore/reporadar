@@ -1,4 +1,4 @@
-// server.ruff — RepoRadar HTTP Server + API Routes
+// server.kujo — RepoRadar HTTP Server + API Routes
 // Serves the dashboard UI and provides JSON API endpoints.
 
 from src.db import init_db, get_db_path, get_setting, set_setting, escape_sql

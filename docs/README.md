@@ -2,7 +2,7 @@
 
 For the top-level project overview and quick start, see [`../README.md`](../README.md).
 
-🔭 **RepoRadar** is a Ruff-powered local-first dashboard for tracking repo status, activity, branches, commits, and uncommitted work across your entire local development ecosystem.
+🔭 **RepoRadar** is a Kujo-powered local-first dashboard for tracking repo status, activity, branches, commits, and uncommitted work across your entire local development ecosystem.
 
 ## One-Liner
 
@@ -22,23 +22,23 @@ A local Git command center that shows at-a-glance visibility across all your loc
 ## Quick Start
 
 ```bash
-# Install Ruff (v1.0.0+)
+# Install Kujo (v1.0.0+)
 # Clone or navigate to the reporadar directory
 
 # Start the server
-ruff run src/main.ruff serve 8080
+kujo run src/main.kujo serve 8080
 
 # Or use CLI commands
-ruff run src/main.ruff add /path/to/your/repo
-ruff run src/main.ruff scan 1
-ruff run src/main.ruff list
+kujo run src/main.kujo add /path/to/your/repo
+kujo run src/main.kujo scan 1
+kujo run src/main.kujo list
 ```
 
 Open `http://127.0.0.1:8080` in your browser.
 
 ## Requirements
 
-- Ruff programming language v1.0.0+
+- Kujo programming language v1.0.0+
 - Git installed and accessible in PATH
 - Modern web browser
 

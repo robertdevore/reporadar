@@ -8,7 +8,7 @@ RepoRadar is designed with security as a first-class concern:
 2. **Read-only by default** — No destructive Git operations
 3. **No network exposure** — Server binds to `127.0.0.1` only
 4. **No telemetry** — Zero data collection or phoning home
-5. **Minimal dependencies** — Only Ruff runtime and Git
+5. **Minimal dependencies** — Only Kujo runtime and Git
 
 ## Server Binding
 

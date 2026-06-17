@@ -1,5 +1,5 @@
-// main.ruff — RepoRadar CLI Entry Point
-// Usage: ruff run src/main.ruff [command]
+// main.kujo — RepoRadar CLI Entry Point
+// Usage: kujo run src/main.kujo [command]
 
 from src.server import start_server, discover_repos
 from src.scanner import scan_repo, collect_recent_commits
@@ -10,7 +10,7 @@ from src.db import init_db, get_setting
 export func print_usage() {
 	print("RepoRadar v0.1.0 — Local Git Repository Dashboard")
 	print("")
-	print("Usage: ruff run src/main.ruff [command] [options]")
+	print("Usage: kujo run src/main.kujo [command] [options]")
 	print("")
 	print("Commands:")
 	print("  serve [port]        Start the dashboard server (default port: 8080)")
@@ -24,11 +24,11 @@ export func print_usage() {
 	print("  help                Show this help")
 	print("")
 	print("Examples:")
-	print("  ruff run src/main.ruff serve 8080")
-	print("  ruff run src/main.ruff add /Users/me/my-project")
-	print("  ruff run src/main.ruff scan 1")
-	print("  ruff run src/main.ruff scan-all")
-	print("  ruff run src/main.ruff list")
+	print("  kujo run src/main.kujo serve 8080")
+	print("  kujo run src/main.kujo add /Users/me/my-project")
+	print("  kujo run src/main.kujo scan 1")
+	print("  kujo run src/main.kujo scan-all")
+	print("  kujo run src/main.kujo list")
 }
 
 /// cmd_list prints all tracked repos.

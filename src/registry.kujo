@@ -1,4 +1,4 @@
-// registry.ruff — RepoRadar Repo Registry CRUD Operations
+// registry.kujo — RepoRadar Repo Registry CRUD Operations
 
 from src.db import escape_sql
 from src.scanner import validate_repo_path, validate_git_repo, get_canonical_path

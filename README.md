@@ -1,12 +1,12 @@
 # RepoRadar
 
-RepoRadar is a local-first Git repository dashboard built in the Ruff programming language. It gives teams and solo developers a fast, polished view of local repositories without sending data off the machine.
+RepoRadar is a local-first Git repository dashboard built in the Kujo programming language. It gives teams and solo developers a fast, polished view of local repositories without sending data off the machine.
 
 ## Why it exists
 
 - Give one place to inspect the state of every local repo
 - Keep Git inspection read-only and safe by default
-- Demonstrate a complete Ruff application with CLI, HTTP, SQLite, and static frontend layers working together
+- Demonstrate a complete Kujo application with CLI, HTTP, SQLite, and static frontend layers working together
 
 ## What it does
 
@@ -18,17 +18,17 @@ RepoRadar is a local-first Git repository dashboard built in the Ruff programmin
 
 ## Requirements
 
-- **Ruff v1.0.0+** — The Ruff language runtime
+- **Kujo v1.0.0+** — The Kujo language runtime
 - **Git** — Must be installed and available on `PATH`
 - **macOS, Linux, or WSL** — Any Unix-like environment is supported
 
-If you have a Ruff binary already built locally, point your shell at it or use the full path directly.
+If you have a Kujo binary already built locally, point your shell at it or use the full path directly.
 
 ## Quick start
 
 ```bash
-ruff --version
-ruff run src/main.ruff serve 8080
+kujo --version
+kujo run src/main.kujo serve 8080
 ```
 
 Then open `http://127.0.0.1:8080`.
@@ -37,22 +37,22 @@ Then open `http://127.0.0.1:8080`.
 
 ```bash
 # Add a repository
-ruff run src/main.ruff add /path/to/repo
+kujo run src/main.kujo add /path/to/repo
 
 # List tracked repositories
-ruff run src/main.ruff list
+kujo run src/main.kujo list
 
 # Scan one tracked repository by ID
-ruff run src/main.ruff scan 1
+kujo run src/main.kujo scan 1
 
 # Scan all tracked repositories
-ruff run src/main.ruff scan-all
+kujo run src/main.kujo scan-all
 
 # Discover Git repositories under a parent directory
-ruff run src/main.ruff discover /path/to/parent
+kujo run src/main.kujo discover /path/to/parent
 
 # Export the registry to JSON
-ruff run src/main.ruff export
+kujo run src/main.kujo export
 ```
 
 ## Configuration
@@ -71,8 +71,8 @@ All runtime settings are stored locally in SQLite and can be managed from the Se
 ```text
 reporadar/
   README.md
-  ruff.toml
-  src/        # Ruff application code
+  kujo.toml
+  src/        # Kujo application code
   static/     # Browser UI assets
   tests/      # Scanner, registry, and integration tests
   docs/       # Longer-form docs and operational guidance
@@ -84,15 +84,15 @@ reporadar/
 Run the full suite from the project root:
 
 ```bash
-ruff test tests/
+kujo test tests/
 ```
 
 Run a single suite when iterating:
 
 ```bash
-ruff test tests/test_scanner.ruff
-ruff test tests/test_registry.ruff
-ruff test tests/test_integration.ruff
+kujo test tests/test_scanner.kujo
+kujo test tests/test_registry.kujo
+kujo test tests/test_integration.kujo
 ```
 
 ## Security model
@@ -115,7 +115,7 @@ ruff test tests/test_integration.ruff
 
 ## Troubleshooting
 
-- If `ruff` is not found, use the full path to the Ruff binary you built locally.
+- If `kujo` is not found, use the full path to the Kujo binary you built locally.
 - If the server will not start, confirm that port `8080` is available or pass a different port.
 - If the database path is wrong, confirm `REPORADAR_DB` is set before launching the app.
 - If a repo does not appear, verify it is a valid Git repository and that the path is readable.
