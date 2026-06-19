@@ -35,7 +35,7 @@ export func sanitize_setting_value(key, value) {
 		return to_string(parsed)
 	}
 
-	if key == "enable_write_actions" {
+	if key == "enable_write_actions" || key == "enable_dependabot_alerts" {
 		if string_value == "true" {
 			return "true"
 		}
@@ -55,6 +55,7 @@ export func sanitize_setting_value(key, value) {
 export func create_indexes(db) {
 	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_repos_archived_pinned_name ON repos (archived, pinned DESC, name ASC)")
 	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_repo_status_snapshots_repo_scanned_at ON repo_status_snapshots (repo_id, scanned_at DESC)")
+	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_repo_status_snapshots_dependabot ON repo_status_snapshots (dependabot_alert_count)")
 	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_repo_file_changes_snapshot_id ON repo_file_changes (snapshot_id)")
 	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_repo_commits_repo_date ON repo_commits (repo_id, date DESC)")
 	db_execute(db, "DELETE FROM repo_commits WHERE id NOT IN (SELECT MIN(id) FROM repo_commits GROUP BY repo_id, commit_hash)")
@@ -79,13 +80,39 @@ export func init_db() {
 	return db
 }
 
+/// table_has_column checks if a table already has a column.
+export func table_has_column(db, table_name, column_name) {
+	mut rows = db_query(db, "PRAGMA table_info(" + table_name + ")")
+	mut i = 0
+	while i < len(rows) {
+		mut row = rows[i]
+		i = i + 1
+		if has_key(row, "name") == 1 {
+			if row["name"] == column_name {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+/// migrate_schema applies additive migrations for existing databases.
+export func migrate_schema(db) {
+	if !table_has_column(db, "repo_status_snapshots", "dependabot_alert_count") {
+		db_execute(db, "ALTER TABLE repo_status_snapshots ADD COLUMN dependabot_alert_count INTEGER DEFAULT -1")
+	}
+	if !table_has_column(db, "repo_status_snapshots", "dependabot_checked_at") {
+		db_execute(db, "ALTER TABLE repo_status_snapshots ADD COLUMN dependabot_checked_at TEXT")
+	}
+}
+
 /// create_schema creates all tables from scratch.
 export func create_schema(db) {
 	db_execute(db, "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))")
 
 	db_execute(db, "CREATE TABLE IF NOT EXISTS repos (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_name TEXT, path TEXT NOT NULL UNIQUE, group_name TEXT DEFAULT '', tags TEXT DEFAULT '', notes TEXT DEFAULT '', pinned INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), last_scan_at TEXT, last_error TEXT)")
 
-	db_execute(db, "CREATE TABLE IF NOT EXISTS repo_status_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, scanned_at TEXT NOT NULL DEFAULT (datetime('now')), branch TEXT, default_branch TEXT, remote_url TEXT, upstream_branch TEXT, latest_commit_hash TEXT, latest_commit_short_hash TEXT, latest_commit_message TEXT, latest_commit_author TEXT, latest_commit_date TEXT, is_clean INTEGER DEFAULT 0, staged_count INTEGER DEFAULT 0, unstaged_count INTEGER DEFAULT 0, untracked_count INTEGER DEFAULT 0, changed_total INTEGER DEFAULT 0, ahead_count INTEGER DEFAULT 0, behind_count INTEGER DEFAULT 0, is_diverged INTEGER DEFAULT 0, is_detached INTEGER DEFAULT 0, has_remote INTEGER DEFAULT 0, scan_error TEXT, FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE)")
+	db_execute(db, "CREATE TABLE IF NOT EXISTS repo_status_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, scanned_at TEXT NOT NULL DEFAULT (datetime('now')), branch TEXT, default_branch TEXT, remote_url TEXT, upstream_branch TEXT, latest_commit_hash TEXT, latest_commit_short_hash TEXT, latest_commit_message TEXT, latest_commit_author TEXT, latest_commit_date TEXT, is_clean INTEGER DEFAULT 0, staged_count INTEGER DEFAULT 0, unstaged_count INTEGER DEFAULT 0, untracked_count INTEGER DEFAULT 0, changed_total INTEGER DEFAULT 0, ahead_count INTEGER DEFAULT 0, behind_count INTEGER DEFAULT 0, is_diverged INTEGER DEFAULT 0, is_detached INTEGER DEFAULT 0, has_remote INTEGER DEFAULT 0, dependabot_alert_count INTEGER DEFAULT -1, dependabot_checked_at TEXT, scan_error TEXT, FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE)")
 
 	db_execute(db, "CREATE TABLE IF NOT EXISTS repo_file_changes (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, snapshot_id INTEGER NOT NULL, file_path TEXT NOT NULL, status_code TEXT NOT NULL, status_label TEXT NOT NULL, staged INTEGER DEFAULT 0, unstaged INTEGER DEFAULT 0, untracked INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE, FOREIGN KEY (snapshot_id) REFERENCES repo_status_snapshots(id) ON DELETE CASCADE)")
 
@@ -100,9 +127,11 @@ export func create_schema(db) {
 	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('default_activity_window', '7')")
 	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('ignored_folders', 'node_modules,vendor,.cache,dist,build,.git')")
 	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('enable_write_actions', 'false')")
+	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('enable_dependabot_alerts', 'false')")
 	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('default_sort_column', 'name')")
 	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('default_sort_order', 'asc')")
 
+	migrate_schema(db)
 	create_indexes(db)
 
 	// Record schema version
@@ -131,7 +160,7 @@ export func ensure_schema(db) {
 	// Ensure all tables exist (idempotent)
 	db_execute(db, "CREATE TABLE IF NOT EXISTS repos (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_name TEXT, path TEXT NOT NULL UNIQUE, group_name TEXT DEFAULT '', tags TEXT DEFAULT '', notes TEXT DEFAULT '', pinned INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), last_scan_at TEXT, last_error TEXT)")
 
-	db_execute(db, "CREATE TABLE IF NOT EXISTS repo_status_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, scanned_at TEXT NOT NULL DEFAULT (datetime('now')), branch TEXT, default_branch TEXT, remote_url TEXT, upstream_branch TEXT, latest_commit_hash TEXT, latest_commit_short_hash TEXT, latest_commit_message TEXT, latest_commit_author TEXT, latest_commit_date TEXT, is_clean INTEGER DEFAULT 0, staged_count INTEGER DEFAULT 0, unstaged_count INTEGER DEFAULT 0, untracked_count INTEGER DEFAULT 0, changed_total INTEGER DEFAULT 0, ahead_count INTEGER DEFAULT 0, behind_count INTEGER DEFAULT 0, is_diverged INTEGER DEFAULT 0, is_detached INTEGER DEFAULT 0, has_remote INTEGER DEFAULT 0, scan_error TEXT, FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE)")
+	db_execute(db, "CREATE TABLE IF NOT EXISTS repo_status_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, scanned_at TEXT NOT NULL DEFAULT (datetime('now')), branch TEXT, default_branch TEXT, remote_url TEXT, upstream_branch TEXT, latest_commit_hash TEXT, latest_commit_short_hash TEXT, latest_commit_message TEXT, latest_commit_author TEXT, latest_commit_date TEXT, is_clean INTEGER DEFAULT 0, staged_count INTEGER DEFAULT 0, unstaged_count INTEGER DEFAULT 0, untracked_count INTEGER DEFAULT 0, changed_total INTEGER DEFAULT 0, ahead_count INTEGER DEFAULT 0, behind_count INTEGER DEFAULT 0, is_diverged INTEGER DEFAULT 0, is_detached INTEGER DEFAULT 0, has_remote INTEGER DEFAULT 0, dependabot_alert_count INTEGER DEFAULT -1, dependabot_checked_at TEXT, scan_error TEXT, FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE)")
 
 	db_execute(db, "CREATE TABLE IF NOT EXISTS repo_file_changes (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, snapshot_id INTEGER NOT NULL, file_path TEXT NOT NULL, status_code TEXT NOT NULL, status_label TEXT NOT NULL, staged INTEGER DEFAULT 0, unstaged INTEGER DEFAULT 0, untracked INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE, FOREIGN KEY (snapshot_id) REFERENCES repo_status_snapshots(id) ON DELETE CASCADE)")
 
@@ -146,9 +175,11 @@ export func ensure_schema(db) {
 	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('default_activity_window', '7')")
 	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('ignored_folders', 'node_modules,vendor,.cache,dist,build,.git')")
 	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('enable_write_actions', 'false')")
+	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('enable_dependabot_alerts', 'false')")
 	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('default_sort_column', 'name')")
 	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('default_sort_order', 'asc')")
 
+	migrate_schema(db)
 	create_indexes(db)
 
 	if current_version < 1 {

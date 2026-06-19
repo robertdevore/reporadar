@@ -1,7 +1,7 @@
 // RepoRadar Scanner Unit Tests
 // Run: kujo test-run tests/test_scanner.kujo
 
-from src.scanner import parse_git_status, validate_repo_path, shell_quote
+from src.scanner import parse_git_status, parse_commit_log_line, validate_repo_path, shell_quote, path_has_git_marker, validate_git_repo, explain_git_command_failure, parse_github_repo_slug, parse_dependabot_alert_count_output
 
 // === parse_git_status Tests ===
 
@@ -151,6 +151,14 @@ test_group "parse_git_status — Edge Cases" {
 // === validate_repo_path Tests ===
 
 test_group "validate_repo_path" {
+	test "current project has git marker" {
+		assert_true(path_has_git_marker("."))
+	}
+
+	test "current project validates as git repo" {
+		assert_true(validate_git_repo("."))
+	}
+
 	test "null returned for valid existing directory" {
 		let result = validate_repo_path("/Users")
 		assert_equal(result, null)
@@ -172,5 +180,57 @@ test_group "shell_quote" {
 		let expected = "'" + "Bob" + "'\"'\"'" + "s Repo" + "'"
 		let result = shell_quote("Bob's Repo")
 		assert_equal(result, expected)
+	}
+}
+
+test_group "git command failure explanations" {
+	test "operation-not-permitted is explained as local permission issue" {
+		let result = explain_git_command_failure("get git status", "/repo", "fatal: Unable to read current working directory: Operation not permitted")
+		assert_true(contains(result, "Permission denied reading repository working directory") == 1)
+		assert_true(contains(result, "Full Disk Access") == 1)
+	}
+
+	test "ordinary git stderr is preserved" {
+		let result = explain_git_command_failure("get git status", "/repo", "fatal: bad revision")
+		assert_equal(result, "Failed to get git status: fatal: bad revision")
+	}
+}
+
+test_group "GitHub remote parsing" {
+	test "https GitHub remotes become owner/repo slugs" {
+		let result = parse_github_repo_slug("https://github.com/kujolang/reporadar.git")
+		assert_equal(result, "kujolang/reporadar")
+	}
+
+	test "ssh GitHub remotes become owner/repo slugs" {
+		let result = parse_github_repo_slug("git@github.com:kujolang/reporadar.git")
+		assert_equal(result, "kujolang/reporadar")
+	}
+
+	test "non-GitHub remotes are ignored" {
+		let result = parse_github_repo_slug("https://example.com/kujolang/reporadar.git")
+		assert_equal(result, "")
+	}
+}
+
+test_group "Dependabot alert count parsing" {
+	test "line-oriented gh page counts are summed" {
+		let result = parse_dependabot_alert_count_output("100\n13\n")
+		assert_equal(result, 113)
+	}
+
+	test "empty output means zero alerts returned by gh" {
+		let result = parse_dependabot_alert_count_output("")
+		assert_equal(result, 0)
+	}
+}
+
+test_group "commit log parsing" {
+	test "commit messages preserve separator text" {
+		let commit = parse_commit_log_line("abcdef---abcdef---Ada---2026-06-19 10:00:00 -0400---fix parser --- keep suffix")
+		assert_equal(commit["hash"], "abcdef")
+		assert_equal(commit["short_hash"], "abcdef")
+		assert_equal(commit["author"], "Ada")
+		assert_equal(commit["message"], "fix parser --- keep suffix")
 	}
 }

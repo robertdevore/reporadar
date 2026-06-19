@@ -8,6 +8,27 @@ export func shell_quote(value) {
 	return "'" + safe_value + "'"
 }
 
+/// path_has_git_marker checks for a local .git directory or file.
+/// This is a vendor-neutral fallback for repos Git cannot enter due to host OS permissions.
+export func path_has_git_marker(path) {
+	if path == null || path == "" {
+		return false
+	}
+	return file_exists(join_path(path, ".git"))
+}
+
+/// explain_git_command_failure turns low-level Git stderr into an actionable scan error.
+export func explain_git_command_failure(action, repo_path, stderr) {
+	mut detail = trim(to_string(stderr))
+	if contains(detail, "Operation not permitted") == 1 {
+		return "Permission denied reading repository working directory: " + repo_path + ". macOS or the filesystem blocked local access before Git could scan it. Grant this app/terminal Full Disk Access or move the repo to an accessible folder."
+	}
+	if detail == "" {
+		return "Failed to " + action
+	}
+	return "Failed to " + action + ": " + detail
+}
+
 export func validate_git_repo(path) {
 	mut result = execute_status("git -C " + shell_quote(path) + " rev-parse --is-inside-work-tree 2>/dev/null")
 	if result.success && result.exitcode == 0 {
@@ -15,6 +36,9 @@ export func validate_git_repo(path) {
 		if stdout == "true" {
 			return true
 		}
+	}
+	if path_has_git_marker(path) {
+		return true
 	}
 	return false
 }
@@ -25,7 +49,7 @@ export func validate_repo_path(path) {
 	if !file_exists(path) {
 		return "Path does not exist: " + path
 	}
-	if !path_is_dir(path) {
+	if !path_is_dir(path) && !path_has_git_marker(path) {
 		return "Path is not a directory: " + path
 	}
 	return null
@@ -238,6 +262,26 @@ mut staged = 0
 	return result
 }
 
+/// parse_commit_log_line parses the scanner's delimited git log format.
+export func parse_commit_log_line(line) {
+	mut parts = split(to_string(line), "---")
+	mut commit = {
+		"hash": "",
+		"short_hash": "",
+		"author": "",
+		"date": "",
+		"message": ""
+	}
+
+	if len(parts) > 0 { commit["hash"] = parts[0] }
+	if len(parts) > 1 { commit["short_hash"] = parts[1] }
+	if len(parts) > 2 { commit["author"] = parts[2] }
+	if len(parts) > 3 { commit["date"] = parts[3] }
+	if len(parts) > 4 { commit["message"] = join(slice(parts, 4, len(parts)), "---") }
+
+	return commit
+}
+
 /// get_latest_commit returns the latest commit info as a dict.
 /// Uses null-safe parsing.
 export func get_latest_commit(repo_path) {
@@ -263,23 +307,7 @@ export func get_latest_commit(repo_path) {
 		}
 	}
 
-	// Split by separator
-	mut parts = split(output, "---")
-	mut commit = {
-		"hash": "",
-		"short_hash": "",
-		"author": "",
-		"date": "",
-		"message": ""
-	}
-
-	if len(parts) > 0 { commit["hash"] = parts[0] }
-	if len(parts) > 1 { commit["short_hash"] = parts[1] }
-	if len(parts) > 2 { commit["author"] = parts[2] }
-	if len(parts) > 3 { commit["date"] = parts[3] }
-	if len(parts) > 4 { commit["message"] = parts[4] }
-
-	return commit
+	return parse_commit_log_line(output)
 }
 
 /// get_remote_url returns the origin remote URL, or empty string if none.
@@ -289,6 +317,76 @@ export func get_remote_url(repo_path) {
 		return trim(result.stdout)
 	}
 	return ""
+}
+
+/// parse_github_repo_slug extracts owner/repo from common GitHub remote URL forms.
+export func parse_github_repo_slug(remote_url) {
+	if remote_url == null || remote_url == "" {
+		return ""
+	}
+
+	mut value = trim(to_string(remote_url))
+	if ends_with(value, ".git") {
+		value = substring(value, 0, len(value) - 4)
+	}
+	if ends_with(value, "/") {
+		value = substring(value, 0, len(value) - 1)
+	}
+
+	mut slug = ""
+	if contains(value, "github.com:") == 1 {
+		mut parts = split(value, "github.com:")
+		if len(parts) > 1 {
+			slug = parts[1]
+		}
+	} else if contains(value, "github.com/") == 1 {
+		mut parts = split(value, "github.com/")
+		if len(parts) > 1 {
+			slug = parts[1]
+		}
+	}
+
+	if slug == "" {
+		return ""
+	}
+
+	mut slug_parts = split(slug, "/")
+	if len(slug_parts) < 2 {
+		return ""
+	}
+	return slug_parts[0] + "/" + slug_parts[1]
+}
+
+/// parse_dependabot_alert_count_output sums line-oriented counts from gh api --paginate.
+export func parse_dependabot_alert_count_output(output) {
+	mut lines = split(trim(to_string(output)), "\n")
+	mut total = 0
+	mut i = 0
+	while i < len(lines) {
+		mut line = trim(lines[i])
+		i = i + 1
+		if line == "" {
+			continue
+		}
+		total = total + parse_int(line)
+	}
+	return total
+}
+
+/// count_dependabot_alerts returns open GitHub Dependabot alerts, or -1 when unavailable.
+export func count_dependabot_alerts(remote_url) {
+	mut slug = parse_github_repo_slug(remote_url)
+	if slug == "" {
+		return -1
+	}
+
+	mut endpoint = "/repos/" + slug + "/dependabot/alerts?state=open&per_page=100"
+	mut command = "command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1 && gh api " + shell_quote(endpoint) + " --paginate --jq " + shell_quote("length") + " 2>/dev/null"
+	mut result = execute_status(command)
+	if !result.success || result.exitcode != 0 {
+		return -1
+	}
+	return parse_dependabot_alert_count_output(result.stdout)
 }
 
 /// get_upstream_info returns the upstream branch name and ahead/behind counts.
@@ -335,6 +433,11 @@ export func get_upstream_info(repo_path) {
 /// scan_repo performs a full scan of a single git repository.
 /// Returns a dict with scan results and any error message.
 export func scan_repo(repo_path) {
+	return scan_repo_with_options(repo_path, false)
+}
+
+/// scan_repo_with_options performs a full scan with optional remote security enrichment.
+export func scan_repo_with_options(repo_path, enable_dependabot_alerts) {
 	mut result = {
 		"success": true,
 		"error": "",
@@ -357,6 +460,7 @@ export func scan_repo(repo_path) {
 		"is_diverged": 0,
 		"is_detached": 0,
 		"has_remote": 0,
+		"dependabot_alert_count": -1,
 		"file_changes": []
 	}
 
@@ -373,12 +477,12 @@ export func scan_repo(repo_path) {
 	// Get branch and status via porcelain
 	mut status_output = ""
 	try {
-		mut status_result = execute_status("git -C " + shell_quote(repo_path) + " status --porcelain=v1 --branch 2>/dev/null")
+		mut status_result = execute_status("git -C " + shell_quote(repo_path) + " status --porcelain=v1 --branch")
 		if status_result.success && status_result.exitcode == 0 {
 			status_output = status_result.stdout
 		} else {
 			result["success"] = false
-			result["error"] = "Failed to get git status: " + status_result.stderr
+			result["error"] = explain_git_command_failure("get git status", repo_path, status_result.stderr)
 			return result
 		}
 	} except err {
@@ -426,6 +530,9 @@ export func scan_repo(repo_path) {
 	result["remote_url"] = get_remote_url(repo_path)
 	if result["remote_url"] != "" {
 		result["has_remote"] = 1
+		if enable_dependabot_alerts {
+			result["dependabot_alert_count"] = count_dependabot_alerts(result["remote_url"])
+		}
 	}
 
 	// If upstream wasn't found via status parsing, try explicit command
@@ -485,16 +592,8 @@ export func collect_recent_commits(repo_path, days) {
 			continue
 		}
 
-		mut parts = split(line, "---")
-		if len(parts) >= 5 {
-			mut commit = {
-				"hash": parts[0],
-				"short_hash": parts[1],
-				"author": parts[2],
-				"date": parts[3],
-				"message": parts[4]
-			}
-			commits = push(commits, commit)
+		if len(split(line, "---")) >= 5 {
+			commits = push(commits, parse_commit_log_line(line))
 		}
 	}
 

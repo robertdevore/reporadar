@@ -2,7 +2,7 @@
 // Usage: kujo run src/main.kujo [command]
 
 from src.server import start_server, discover_repos
-from src.scanner import scan_repo, collect_recent_commits
+from src.scanner import scan_repo_with_options, collect_recent_commits
 from src.registry import add_repo, remove_repo, get_all_repos, get_repo_by_id, store_scan_result, store_repo_commits
 from src.db import init_db, get_setting
 
@@ -102,7 +102,8 @@ export func cmd_scan(repo_id_str) {
 	}
 
 	print("Scanning: " + repo["path"] + " ...")
-	mut scan_result = scan_repo(repo["path"])
+	mut enable_dependabot_alerts = get_setting(db, "enable_dependabot_alerts", "false") == "true"
+	mut scan_result = scan_repo_with_options(repo["path"], enable_dependabot_alerts)
 	store_scan_result(db, repo_id, scan_result)
 
 	if scan_result["success"] {
@@ -137,7 +138,8 @@ export func cmd_scan_all() {
 		mut repo = repos[i]
 		i = i + 1
 		print("  [" + to_string(i) + "/" + to_string(len(repos)) + "] " + repo["name"] + " ...")
-		mut scan_result = scan_repo(repo["path"])
+		mut enable_dependabot_alerts = get_setting(db, "enable_dependabot_alerts", "false") == "true"
+		mut scan_result = scan_repo_with_options(repo["path"], enable_dependabot_alerts)
 		store_scan_result(db, repo["id"], scan_result)
 
 		if scan_result["success"] {

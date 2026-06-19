@@ -2,7 +2,7 @@
 // Serves the dashboard UI and provides JSON API endpoints.
 
 from src.db import init_db, get_db_path, get_setting, set_setting, escape_sql
-from src.scanner import validate_git_repo, validate_repo_path, get_canonical_path, scan_repo, collect_recent_commits
+from src.scanner import validate_git_repo, validate_repo_path, get_canonical_path, scan_repo_with_options, collect_recent_commits
 from src.registry import add_repo, remove_repo, update_repo, get_all_repos, get_repo_by_id, store_scan_result, store_repo_commits, get_repo_file_changes, get_repo_scan_history, get_repo_commits, get_commits_in_window, get_commits_by_day, get_commit_count_per_repo
 
 /// cors_headers returns common CORS headers for local development.
@@ -173,7 +173,8 @@ export func api_scan_repo(req) {
 	mut repo_path = repo["path"]
 
 	// Run the scan
-	mut scan_result = scan_repo(repo_path)
+	mut enable_dependabot_alerts = get_setting(db, "enable_dependabot_alerts", "false") == "true"
+	mut scan_result = scan_repo_with_options(repo_path, enable_dependabot_alerts)
 
 	// Store the result
 	mut snapshot_id = 0
@@ -253,6 +254,7 @@ export func api_dashboard_summary(req) {
 		"no_remote": 0,
 		"errors": 0,
 		"stale": 0,
+		"dependabot_alerts": 0,
 		"most_recently_active": "",
 		"last_full_scan": ""
 	}
@@ -293,6 +295,12 @@ export func api_dashboard_summary(req) {
 		if has_key(repo, "scan_error") == 1 {
 			if repo["scan_error"] != null && repo["scan_error"] != "" {
 				summary["errors"] = summary["errors"] + 1
+			}
+		}
+
+		if has_key(repo, "dependabot_alert_count") == 1 {
+			if repo["dependabot_alert_count"] != null && to_int(repo["dependabot_alert_count"]) > 0 {
+				summary["dependabot_alerts"] = summary["dependabot_alerts"] + to_int(repo["dependabot_alert_count"])
 			}
 		}
 
@@ -440,7 +448,8 @@ export func api_bulk_scan(req) {
 		mut repo = repos[i]
 		i = i + 1
 
-		mut scan_result = scan_repo(repo["path"])
+		mut enable_dependabot_alerts = get_setting(db, "enable_dependabot_alerts", "false") == "true"
+		mut scan_result = scan_repo_with_options(repo["path"], enable_dependabot_alerts)
 		store_scan_result(db, repo["id"], scan_result)
 
 		if scan_result["success"] {

@@ -26,6 +26,7 @@ async function loadSettings() {
     document.getElementById('activity-window').value = s.default_activity_window || '7';
     document.getElementById('ignored-folders').value = s.ignored_folders || 'node_modules,vendor,.cache,dist,build,.git';
     document.getElementById('enable-write').checked = s.enable_write_actions === 'true';
+    document.getElementById('enable-dependabot').checked = s.enable_dependabot_alerts === 'true';
   } catch (err) {
     document.getElementById('loading-state').classList.add('hidden');
     showToast('Failed to load settings', 'error');
@@ -37,7 +38,8 @@ async function saveSettings() {
     stale_threshold_days: document.getElementById('stale-threshold').value,
     default_activity_window: document.getElementById('activity-window').value,
     ignored_folders: document.getElementById('ignored-folders').value,
-    enable_write_actions: document.getElementById('enable-write').checked ? 'true' : 'false'
+    enable_write_actions: document.getElementById('enable-write').checked ? 'true' : 'false',
+    enable_dependabot_alerts: document.getElementById('enable-dependabot').checked ? 'true' : 'false'
   };
 
   try {
