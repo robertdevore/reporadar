@@ -6,16 +6,21 @@ let allRepos = [];
 let sortColumn = 'name';
 let sortOrder = 'asc';
 let currentFilter = 'all';
+let initialViewLoaded = false;
 
 // === Init ===
 document.addEventListener('DOMContentLoaded', () => {
+  applyViewFromUrl();
   setupEventListeners();
   initPage();
 });
 
 async function initPage() {
   await Promise.all([loadRepos(), loadSummary()]);
-  loadGroups();
+  loadFilterOptions();
+  applyViewFromUrl();
+  initialViewLoaded = true;
+  renderTable();
 }
 
 // === Event Listeners ===
@@ -30,6 +35,13 @@ function setupEventListeners() {
   document.getElementById('search-input').addEventListener('input', debounce(renderTable, 300));
   document.getElementById('filter-status').addEventListener('change', renderTable);
   document.getElementById('filter-group').addEventListener('change', renderTable);
+  document.getElementById('filter-tag').addEventListener('change', renderTable);
+  document.getElementById('btn-copy-view').addEventListener('click', copyCurrentViewLink);
+  document.getElementById('btn-reset-view').addEventListener('click', resetView);
+  window.addEventListener('popstate', () => {
+    applyViewFromUrl();
+    renderTable(false);
+  });
 
   // Sortable columns
   document.querySelectorAll('.repo-table th.sortable').forEach(th => {
@@ -93,26 +105,140 @@ async function loadSummary() {
     document.getElementById('sum-noremote').textContent = s.no_remote || 0;
     document.getElementById('sum-errors').textContent = s.errors || 0;
     document.getElementById('sum-stale').textContent = s.stale || 0;
+    document.getElementById('sum-alerts').textContent = s.dependabot_alerts || 0;
   } catch (err) {
     // Silently fail
   }
 }
 
-async function loadGroups() {
+async function loadFilterOptions() {
   try {
     const groups = new Set();
+    const tags = new Set();
     allRepos.forEach(r => {
-      if (r.group_name) groups.add(r.group_name);
+      splitTokens(r.group_name).forEach(g => groups.add(g));
+      splitTokens(r.tags).forEach(t => tags.add(t));
     });
-    const sel = document.getElementById('filter-group');
-    sel.innerHTML = '<option value="">All Groups</option>';
+    const groupSel = document.getElementById('filter-group');
+    const tagSel = document.getElementById('filter-tag');
+    const selectedGroup = groupSel.value;
+    const selectedTag = tagSel.value;
+    groupSel.innerHTML = '<option value="">All Groups</option>';
     [...groups].sort().forEach(g => {
       const opt = document.createElement('option');
       opt.value = g;
       opt.textContent = g;
-      sel.appendChild(opt);
+      groupSel.appendChild(opt);
     });
+    tagSel.innerHTML = '<option value="">All Tags</option>';
+    [...tags].sort().forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t;
+      tagSel.appendChild(opt);
+    });
+    groupSel.value = selectedGroup;
+    tagSel.value = selectedTag;
   } catch (err) {}
+}
+
+function applyViewFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const status = params.get('status') || params.get('filter') || 'all';
+  const group = params.get('group') || params.get('project') || '';
+  const tag = params.get('tag') || '';
+  const query = params.get('q') || params.get('search') || '';
+  const sort = params.get('sort') || 'name';
+  const dir = params.get('dir') || 'asc';
+
+  setElementValue('filter-status', status);
+  setElementValue('filter-group', group);
+  setElementValue('filter-tag', tag);
+  setElementValue('search-input', query);
+  sortColumn = sort;
+  sortOrder = dir === 'desc' ? 'desc' : 'asc';
+}
+
+function updateUrlFromView() {
+  const params = new URLSearchParams();
+  const status = document.getElementById('filter-status').value;
+  const group = document.getElementById('filter-group').value;
+  const tag = document.getElementById('filter-tag').value;
+  const query = document.getElementById('search-input').value.trim();
+
+  if (status && status !== 'all') params.set('status', status);
+  if (group) params.set('group', group);
+  if (tag) params.set('tag', tag);
+  if (query) params.set('q', query);
+  if (sortColumn !== 'name') params.set('sort', sortColumn);
+  if (sortOrder !== 'asc') params.set('dir', sortOrder);
+
+  const queryString = params.toString();
+  const nextUrl = window.location.pathname + (queryString ? '?' + queryString : '');
+  if (nextUrl !== window.location.pathname + window.location.search) {
+    window.history.replaceState({}, '', nextUrl);
+  }
+}
+
+function resetView() {
+  document.getElementById('filter-status').value = 'all';
+  document.getElementById('filter-group').value = '';
+  document.getElementById('filter-tag').value = '';
+  document.getElementById('search-input').value = '';
+  sortColumn = 'name';
+  sortOrder = 'asc';
+  renderTable();
+}
+
+async function copyCurrentViewLink() {
+  updateUrlFromView();
+  const href = window.location.href;
+  try {
+    await navigator.clipboard.writeText(href);
+    showToast('View link copied', 'success');
+  } catch (err) {
+    prompt('Copy view link:', href);
+  }
+}
+
+function updateViewSummary(filteredCount) {
+  const countEl = document.getElementById('filtered-count');
+  if (countEl) {
+    countEl.textContent = filteredCount + ' of ' + allRepos.length + ' repos';
+  }
+
+  const chip = document.getElementById('view-chip');
+  if (!chip) return;
+  const parts = [];
+  const status = document.getElementById('filter-status').value;
+  const group = document.getElementById('filter-group').value;
+  const tag = document.getElementById('filter-tag').value;
+  const query = document.getElementById('search-input').value.trim();
+  if (status && status !== 'all') parts.push(status);
+  if (group) parts.push('group: ' + group);
+  if (tag) parts.push('tag: ' + tag);
+  if (query) parts.push('search: ' + query);
+  chip.textContent = parts.length > 0 ? parts.join(' / ') : '';
+  chip.classList.toggle('hidden', parts.length === 0);
+}
+
+function setElementValue(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.value = value || '';
+}
+
+function splitTokens(value) {
+  if (!value) return [];
+  return String(value)
+    .split(',')
+    .map(v => v.trim())
+    .filter(Boolean);
+}
+
+function hasToken(value, wanted) {
+  const needle = String(wanted || '').trim().toLowerCase();
+  if (!needle) return true;
+  return splitTokens(value).some(token => token.toLowerCase() === needle);
 }
 
 // === CRUD Operations ===
@@ -141,7 +267,7 @@ async function addRepo() {
       showToast('Repository added successfully!', 'success');
       loadRepos();
       loadSummary();
-      loadGroups();
+      loadFilterOptions();
     } else {
       showError('add-error', result.error);
     }
@@ -173,7 +299,7 @@ async function removeRepo(repoId, name) {
       showToast('Repository removed from tracking', 'success');
       loadRepos();
       loadSummary();
-      loadGroups();
+      loadFilterOptions();
     } else {
       showToast(result.error, 'error');
     }
@@ -210,7 +336,7 @@ async function saveEdit() {
       showToast('Repository updated', 'success');
       loadRepos();
       loadSummary();
-      loadGroups();
+      loadFilterOptions();
     } else {
       showError('edit-error', result.error);
     }
@@ -266,18 +392,22 @@ function clearAddForm() {
 }
 
 // === Table Rendering ===
-function renderTable() {
+function renderTable(syncUrl = true) {
   let repos = [...allRepos];
 
   // Apply filter
   const statusFilter = document.getElementById('filter-status').value;
   const groupFilter = document.getElementById('filter-group').value;
+  const tagFilter = document.getElementById('filter-tag').value;
 
   if (statusFilter !== 'all') {
     repos = repos.filter(r => matchStatusFilter(r, statusFilter));
   }
   if (groupFilter) {
-    repos = repos.filter(r => r.group_name === groupFilter);
+    repos = repos.filter(r => hasToken(r.group_name, groupFilter));
+  }
+  if (tagFilter) {
+    repos = repos.filter(r => hasToken(r.tags, tagFilter));
   }
 
   // Apply search
@@ -305,7 +435,7 @@ function renderTable() {
   if (repos.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="14" style="text-align:center;padding:32px;color:var(--text-muted);">
+        <td colspan="15" style="text-align:center;padding:32px;color:var(--text-muted);">
           No repositories match the current filters.
         </td>
       </tr>
@@ -316,6 +446,10 @@ function renderTable() {
 
   // Update counts
   currentFilter = statusFilter;
+  updateViewSummary(repos.length);
+  if (syncUrl && initialViewLoaded) {
+    updateUrlFromView();
+  }
 }
 
 function matchStatusFilter(repo, filter) {
@@ -346,9 +480,11 @@ function matchSearch(repo, query) {
   const fields = [
     repo.name, repo.display_name, repo.path,
     repo.group_name, repo.tags, repo.branch,
-    repo.latest_commit_message, repo.remote_url
+    repo.latest_commit_hash, repo.latest_commit_short_hash,
+    repo.latest_commit_message, repo.remote_url,
+    repo.dependabot_alert_count
   ];
-  return fields.some(f => f && f.toLowerCase().includes(query));
+  return fields.some(f => f !== null && f !== undefined && String(f).toLowerCase().includes(query));
 }
 
 function getSortValue(repo, col) {
@@ -380,6 +516,13 @@ function renderRow(repo) {
   const scanDate = repo.scanned_at ? formatDate(repo.scanned_at) : 'Never';
   const ahead = repo.ahead_count || 0;
   const behind = repo.behind_count || 0;
+  const commitUrl = hostedCommitUrl(repo.remote_url, repo.latest_commit_hash);
+  const commitLabel = repo.latest_commit_short_hash || '';
+  const commitHtml = commitLabel
+    ? (commitUrl ? '<a href="' + escAttr(commitUrl) + '" target="_blank" rel="noopener" class="commit-hash-link">' + escHtml(commitLabel) + '</a>' : '<span class="commit-hash">' + escHtml(commitLabel) + '</span>')
+    : '';
+  const lastCommitHtml = commitDate === '-' && !commitHtml ? '-' : (commitHtml ? commitHtml + '<span class="muted-cell"> ' + commitDate + '</span>' : commitDate);
+  const alertHtml = renderDependabotAlerts(repo.dependabot_alert_count);
 
   const tags = (repo.tags || '').split(',').filter(t => t.trim()).map(t =>
     '<span class="tag">' + escHtml(t.trim()) + '</span>'
@@ -408,7 +551,8 @@ function renderRow(repo) {
       <td>${repo.untracked_count || 0}</td>
       <td>${aheadHtml}</td>
       <td>${behindHtml}</td>
-      <td title="${repo.latest_commit_message || ''}">${commitDate}</td>
+      <td>${alertHtml}</td>
+      <td title="${escAttr(repo.latest_commit_message || '')}">${lastCommitHtml}</td>
       <td>${scanDate}</td>
       <td class="action-cell">
         <button class="btn btn-sm btn-secondary" onclick="scanRepo(${repo.id})" title="Scan"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
@@ -417,6 +561,66 @@ function renderRow(repo) {
       </td>
     </tr>
   `;
+}
+
+function renderDependabotAlerts(count) {
+  if (count === null || count === undefined || count === '' || Number(count) < 0) {
+    return '<span class="muted-cell" title="Dependabot alert count unavailable">-</span>';
+  }
+  const n = Number(count);
+  if (n === 0) {
+    return '<span class="badge badge-clean" title="No open Dependabot alerts found">0</span>';
+  }
+  return '<span class="badge badge-alert" title="' + n + ' open Dependabot alerts">' + n + '</span>';
+}
+
+function hostedCommitUrl(remoteUrl, hash) {
+  if (!remoteUrl || !hash) return '';
+  const info = hostedRepoInfo(remoteUrl);
+  if (!info || !info.slug) return '';
+  if (info.vendor === 'github') {
+    return info.baseUrl + '/' + info.slug + '/commit/' + encodeURIComponent(hash);
+  }
+  if (info.vendor === 'gitlab') {
+    return info.baseUrl + '/' + info.slug + '/-/commit/' + encodeURIComponent(hash);
+  }
+  if (info.vendor === 'bitbucket') {
+    return info.baseUrl + '/' + info.slug + '/commits/' + encodeURIComponent(hash);
+  }
+  return '';
+}
+
+function hostedRepoInfo(remoteUrl) {
+  let value = String(remoteUrl).trim().replace(/\.git$/, '').replace(/\/$/, '');
+  let host = '';
+  let slug = '';
+
+  const sshMatch = value.match(/^[^@]+@([^:]+):(.+)$/);
+  if (sshMatch) {
+    host = sshMatch[1];
+    slug = sshMatch[2];
+  } else {
+    const httpsMatch = value.match(/^https?:\/\/([^/]+)\/(.+)$/);
+    if (httpsMatch) {
+      host = httpsMatch[1];
+      slug = httpsMatch[2];
+    }
+  }
+
+  if (!host || !slug) return null;
+  const cleanSlug = slug.split('/').filter(Boolean).join('/');
+  const lowerHost = host.toLowerCase();
+  let vendor = '';
+  if (lowerHost === 'github.com') vendor = 'github';
+  if (lowerHost.includes('gitlab')) vendor = 'gitlab';
+  if (lowerHost === 'bitbucket.org') vendor = 'bitbucket';
+  if (!vendor) return null;
+
+  return {
+    vendor,
+    baseUrl: 'https://' + host,
+    slug: cleanSlug
+  };
 }
 
 // === Utility Functions ===
@@ -445,6 +649,10 @@ function escHtml(str) {
   if (!str) return '';
   str = String(str);
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function escAttr(str) {
+  return escHtml(str).replace(/'/g, '&#39;');
 }
 
 function openModal(id) {

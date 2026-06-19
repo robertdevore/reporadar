@@ -33,6 +33,7 @@
     <div class="summary-card no-remote"><span class="summary-label">No Remote</span><span class="summary-value" id="sum-noremote">-</span></div>
     <div class="summary-card error"><span class="summary-label">Errors</span><span class="summary-value" id="sum-errors">-</span></div>
     <div class="summary-card stale"><span class="summary-label">Stale</span><span class="summary-value" id="sum-stale">-</span></div>
+    <div class="summary-card alerts"><span class="summary-label">Alerts</span><span class="summary-value" id="sum-alerts">-</span></div>
   </div>
 
   <!-- Controls -->
@@ -56,8 +57,15 @@
       <select id="filter-group" class="filter-select">
         <option value="">All Groups</option>
       </select>
+      <select id="filter-tag" class="filter-select">
+        <option value="">All Tags</option>
+      </select>
+      <button id="btn-copy-view" class="btn btn-secondary" title="Copy current view link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Share View</button>
+      <button id="btn-reset-view" class="btn btn-ghost" title="Reset filters"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> Reset</button>
     </div>
     <div class="controls-right">
+      <span id="filtered-count" class="scan-status"></span>
+      <span id="view-chip" class="view-chip hidden"></span>
       <span id="scan-status" class="scan-status"></span>
       <span id="progress-text" class="progress-text"></span>
     </div>
@@ -79,6 +87,7 @@
           <th class="sortable" data-sort="untracked_count">Untracked</th>
           <th class="sortable" data-sort="ahead_count">↑</th>
           <th class="sortable" data-sort="behind_count">↓</th>
+          <th class="sortable" data-sort="dependabot_alert_count">Alerts</th>
           <th class="sortable" data-sort="latest_commit_date">Last Commit</th>
           <th class="sortable" data-sort="scanned_at">Last Scan</th>
           <th>Actions</th>

@@ -52,6 +52,11 @@ function renderDetail(data) {
   const pinned = repo.pinned === 1 ? ' <span class="badge badge-pinned">★ Pinned</span>' : '';
   const ahead = repo.ahead_count || 0;
   const behind = repo.behind_count || 0;
+  const latestCommitUrl = hostedCommitUrl(repo.remote_url, repo.latest_commit_hash);
+  const latestCommitHash = repo.latest_commit_short_hash || '-';
+  const latestCommitHashHtml = latestCommitUrl
+    ? '<a href="' + escAttr(latestCommitUrl) + '" target="_blank" rel="noopener" class="commit-hash">' + escHtml(latestCommitHash) + '</a>'
+    : '<span class="commit-hash">' + escHtml(latestCommitHash) + '</span>';
 
   let aheadBehind = '';
   if (repo.is_diverged === 1) {
@@ -86,7 +91,7 @@ function renderDetail(data) {
         <div class="commit-list">
           ${commits.slice(0, 20).map(c => `
             <div class="commit-item">
-              <span class="commit-hash">${escHtml(c.short_hash)}</span>
+              ${renderCommitHash(repo.remote_url, c)}
               <span class="commit-msg">${escHtml(c.message)}</span>
               <span class="commit-meta">— ${escHtml(c.author)}, ${formatDate(c.date)}</span>
             </div>
@@ -141,11 +146,12 @@ function renderDetail(data) {
         <div class="info-row"><span class="info-label">Unstaged</span><span class="info-value">${repo.unstaged_count || 0}</span></div>
         <div class="info-row"><span class="info-label">Untracked</span><span class="info-value">${repo.untracked_count || 0}</span></div>
         <div class="info-row"><span class="info-label">Total Changed</span><span class="info-value">${repo.changed_total || 0}</span></div>
+        <div class="info-row"><span class="info-label">Dependabot Alerts</span><span class="info-value">${renderDependabotAlerts(repo.dependabot_alert_count)}</span></div>
       </div>
 
       <div class="card">
         <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="m10 9-3 3 3 3"/><path d="m14 15 3-3-3-3"/><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg> Latest Commit</h3>
-        <div class="info-row"><span class="info-label">Hash</span><span class="info-value" style="font-family:monospace;font-size:12px;">${escHtml(repo.latest_commit_short_hash || '-')}</span></div>
+        <div class="info-row"><span class="info-label">Hash</span><span class="info-value">${latestCommitHashHtml}</span></div>
         <div class="info-row"><span class="info-label">Message</span><span class="info-value">${escHtml(repo.latest_commit_message || '-')}</span></div>
         <div class="info-row"><span class="info-label">Author</span><span class="info-value">${escHtml(repo.latest_commit_author || '-')}</span></div>
         <div class="info-row"><span class="info-label">Date</span><span class="info-value">${repo.latest_commit_date ? formatDate(repo.latest_commit_date) : '-'}</span></div>
@@ -178,6 +184,76 @@ function renderFiles(files) {
   }).join('');
 }
 
+function renderCommitHash(remoteUrl, commit) {
+  const hash = commit.commit_hash || commit.hash || '';
+  const shortHash = commit.short_hash || hash.slice(0, 7) || '-';
+  const url = hostedCommitUrl(remoteUrl, hash);
+  if (!url) {
+    return '<span class="commit-hash">' + escHtml(shortHash) + '</span>';
+  }
+  return '<a href="' + escAttr(url) + '" target="_blank" rel="noopener" class="commit-hash">' + escHtml(shortHash) + '</a>';
+}
+
+function renderDependabotAlerts(count) {
+  if (count === null || count === undefined || count === '' || Number(count) < 0) {
+    return '<span class="muted-cell" title="Dependabot alert count unavailable">Unavailable</span>';
+  }
+  const n = Number(count);
+  if (n === 0) {
+    return '<span class="badge badge-clean">0 open</span>';
+  }
+  return '<span class="badge badge-alert">' + n + ' open</span>';
+}
+
+function hostedCommitUrl(remoteUrl, hash) {
+  if (!remoteUrl || !hash) return '';
+  const info = hostedRepoInfo(remoteUrl);
+  if (!info || !info.slug) return '';
+  if (info.vendor === 'github') {
+    return info.baseUrl + '/' + info.slug + '/commit/' + encodeURIComponent(hash);
+  }
+  if (info.vendor === 'gitlab') {
+    return info.baseUrl + '/' + info.slug + '/-/commit/' + encodeURIComponent(hash);
+  }
+  if (info.vendor === 'bitbucket') {
+    return info.baseUrl + '/' + info.slug + '/commits/' + encodeURIComponent(hash);
+  }
+  return '';
+}
+
+function hostedRepoInfo(remoteUrl) {
+  let value = String(remoteUrl).trim().replace(/\.git$/, '').replace(/\/$/, '');
+  let host = '';
+  let slug = '';
+
+  const sshMatch = value.match(/^[^@]+@([^:]+):(.+)$/);
+  if (sshMatch) {
+    host = sshMatch[1];
+    slug = sshMatch[2];
+  } else {
+    const httpsMatch = value.match(/^https?:\/\/([^/]+)\/(.+)$/);
+    if (httpsMatch) {
+      host = httpsMatch[1];
+      slug = httpsMatch[2];
+    }
+  }
+
+  if (!host || !slug) return null;
+  const cleanSlug = slug.split('/').filter(Boolean).join('/');
+  const lowerHost = host.toLowerCase();
+  let vendor = '';
+  if (lowerHost === 'github.com') vendor = 'github';
+  if (lowerHost.includes('gitlab')) vendor = 'gitlab';
+  if (lowerHost === 'bitbucket.org') vendor = 'bitbucket';
+  if (!vendor) return null;
+
+  return {
+    vendor,
+    baseUrl: 'https://' + host,
+    slug: cleanSlug
+  };
+}
+
 async function rescanRepo() {
   try {
     const result = await apiFetch('/api/repos/' + repoId + '/scan', { method: 'POST' });
@@ -205,6 +281,7 @@ async function copyStatusSummary() {
       'Remote: ' + (repo.remote_url || 'None'),
       'Ahead: ' + (repo.ahead_count || 0),
       'Behind: ' + (repo.behind_count || 0),
+      'Dependabot alerts: ' + (Number(repo.dependabot_alert_count) >= 0 ? repo.dependabot_alert_count : 'Unavailable'),
       'Latest: ' + (repo.latest_commit_message || 'N/A'),
       'Last Scan: ' + (repo.scanned_at || 'Never')
     ].join('\n');
@@ -230,6 +307,10 @@ function formatDate(dateStr) {
 function escHtml(str) {
   if (!str) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function escAttr(str) {
+  return escHtml(str).replace(/'/g, '&#39;');
 }
 
 function showToast(message, type) {
