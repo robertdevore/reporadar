@@ -1,6 +1,6 @@
 # RepoRadar
 
-RepoRadar is a local-first Git repository dashboard built in the Kujo programming language. It gives teams and solo developers a fast, polished view of local repositories without sending data off the machine.
+RepoRadar is a local-first Git repository dashboard built in the Kujo programming language. It gives teams and solo developers a fast, polished view of local repositories while keeping default operation on the local machine.
 
 ## Why it exists
 
@@ -13,6 +13,8 @@ RepoRadar is a local-first Git repository dashboard built in the Kujo programmin
 - Tracks repository health, branch divergence, and latest commit data
 - Shows file-level changes, recent commits, and activity trends
 - Supports add, remove, pin, archive, discovery, scan, export, and restore workflows
+- Preserves shareable dashboard views with status, group, tag, search, and sort URL parameters
+- Optionally shows GitHub Dependabot alert counts when explicitly enabled and authenticated through `gh`
 - Serves dashboard, detail, activity, discovery, and settings views
 - Stores everything locally in SQLite with no telemetry or cloud dependency
 
@@ -59,6 +61,7 @@ kujo run src/main.kujo export
 
 - Database path: `~/.reporadar.db`
 - Override the database location with `REPORADAR_DB`
+- Dependabot alert enrichment is disabled by default. Enable it from Settings only when you want RepoRadar to call the GitHub CLI for GitHub remotes.
 
 ```bash
 export REPORADAR_DB=/custom/path/reporadar.db
@@ -79,20 +82,14 @@ reporadar/
   agent/      # Handoff, review, and planning notes
 ```
 
+The distributable project root is intentionally small. Prompt packs, handoff notes, and future-session planning live under `agent/` so the root stays focused on files a new user expects first.
+
 ## Testing
 
 Run the full suite from the project root:
 
 ```bash
-kujo test tests/
-```
-
-Run a single suite when iterating:
-
-```bash
-kujo test tests/test_scanner.kujo
-kujo test tests/test_registry.kujo
-kujo test tests/test_integration.kujo
+kujo test
 ```
 
 ## Security model
@@ -102,6 +99,7 @@ kujo test tests/test_integration.kujo
 - Avoids telemetry, analytics, and remote data upload
 - Keeps secrets and repo metadata in local SQLite storage
 - Escapes SQL and shell-sensitive values in the scan and persistence paths
+- Keeps remote security enrichment opt-in; Dependabot alert checks require the user to enable them and authenticate `gh`
 
 ## Documentation
 
@@ -122,4 +120,4 @@ kujo test tests/test_integration.kujo
 
 ## Status
 
-The project is actively maintained and organized for continued hardening, feature work, and onboarding improvements. See `agent/NEXT_SESSION.md` for the current follow-up list.
+The project is useful and increasingly polished, but not yet "enterprise complete" in the universal sense. The next hardening pass should focus on CI, broader platform testing, auth/threat-model decisions for non-local deployments, and measured scan performance. See `docs/NEXT_SESSION_ENTERPRISE_REVIEW_2026-06-19.md` for the newest follow-up list.

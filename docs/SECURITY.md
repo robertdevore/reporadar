@@ -4,11 +4,11 @@
 
 RepoRadar is designed with security as a first-class concern:
 
-1. **Local-first** — All data stays on your machine
+1. **Local-first by default** — Core scanning and storage stay on your machine
 2. **Read-only by default** — No destructive Git operations
 3. **No network exposure** — Server binds to `127.0.0.1` only
 4. **No telemetry** — Zero data collection or phoning home
-5. **Minimal dependencies** — Only Kujo runtime and Git
+5. **Minimal dependencies** — Only Kujo runtime and Git are required
 
 ## Server Binding
 
@@ -30,6 +30,18 @@ When write actions (Phase 07) are implemented:
 - The exact command is displayed before execution
 - Failed commands show output without bricking the UI
 - All write actions are logged to an audit trail
+
+## Optional Network Enrichment
+
+Dependabot alert counts are disabled by default. When `enable_dependabot_alerts` is set to `true`, scans may call:
+
+```bash
+gh api /repos/<owner>/<repo>/dependabot/alerts
+```
+
+This only applies to GitHub remotes that can be parsed as `owner/repo`, and it returns `-1` when `gh` is missing, unauthenticated, unauthorized, or unavailable. RepoRadar does not store GitHub credentials; authentication remains owned by the GitHub CLI.
+
+Leave this setting disabled for fully offline/local-only operation or environments where repository names should not be sent to GitHub.
 
 ## Input Validation
 

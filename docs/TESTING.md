@@ -8,13 +8,10 @@ RepoRadar uses Kujo's built-in testing framework (`kujo test`). Tests are organi
 
 ```bash
 # Run all tests
-kujo test tests/
-
-# Run specific test file
-kujo test tests/test_scanner.kujo
+kujo test
 
 # Run with verbose output
-kujo test tests/ -v
+kujo test -v
 ```
 
 ## Test Categories
@@ -70,5 +67,5 @@ test "parse_git_status clean repo" {
 ## Current Status
 
 - Scanner unit tests, registry CRUD tests, and integration tests already live in `tests/`.
-- Regression coverage now includes escaped setting values, shell-quoted paths, latest-snapshot file changes, and duplicate commit handling.
+- Regression coverage now includes escaped setting values, opt-in boolean setting normalization, shell-quoted paths, local `.git` marker validation, latest-snapshot file changes, duplicate commit handling, GitHub remote parsing, and Dependabot alert count parsing.
 - The next useful step is to grow edge-case coverage and wire the suites into CI.
