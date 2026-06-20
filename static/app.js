@@ -12,6 +12,7 @@ let sortColumn = 'name';
 let sortOrder = 'asc';
 let currentFilter = 'all';
 let initialViewLoaded = false;
+let scanCloseTimer = null;
 
 // === Init ===
 document.addEventListener('DOMContentLoaded', () => {
@@ -36,6 +37,7 @@ function setupEventListeners() {
   document.getElementById('btn-discover').addEventListener('click', () => window.location.href = '/discovery.html');
   document.getElementById('btn-add-confirm').addEventListener('click', addRepo);
   document.getElementById('btn-edit-confirm').addEventListener('click', saveEdit);
+  document.getElementById('btn-scan-close').addEventListener('click', () => closeModal('modal-scan'));
 
   document.getElementById('search-input').addEventListener('input', debounce(renderTable, 300));
   document.getElementById('filter-status').addEventListener('change', renderTable);
@@ -373,6 +375,7 @@ async function startBulkScan() {
   scanButton.innerHTML = LOADER_ICON + ' Scanning...';
 
   openModal('modal-scan');
+  resetScanCompletionState();
   document.getElementById('progress-bar').style.width = '0%';
   document.getElementById('scan-current').textContent = 'Starting scan...';
   document.getElementById('scan-stats').textContent = '0 of ' + allRepos.length + ' repos scanned';
@@ -419,9 +422,11 @@ async function startBulkScan() {
     document.getElementById('scan-stats').textContent = formatBulkScanStats(totals, allRepos.length);
     await Promise.all([loadRepos(), loadSummary()]);
     loadFilterOptions();
+    showScanCompletion(totals);
   } catch (err) {
     document.getElementById('scan-current').textContent = 'Scan failed';
     document.getElementById('scan-stats').textContent = 'Server connection error';
+    showScanCompletion({ errors: 1 }, true);
   } finally {
     scanButton.disabled = false;
     scanButton.innerHTML = SCAN_ALL_ICON + ' Scan All';
@@ -470,6 +475,41 @@ function formatBulkScanStats(totals, total) {
 function replaceRepoInMemory(updatedRepo) {
   const updatedId = Number(updatedRepo.id);
   allRepos = allRepos.map(repo => Number(repo.id) === updatedId ? updatedRepo : repo);
+}
+
+function resetScanCompletionState() {
+  if (scanCloseTimer) {
+    clearTimeout(scanCloseTimer);
+    scanCloseTimer = null;
+  }
+  const message = document.getElementById('scan-complete-message');
+  const actions = document.getElementById('scan-actions');
+  if (message) {
+    message.className = 'scan-complete-message hidden';
+    message.textContent = '';
+  }
+  if (actions) actions.classList.add('hidden');
+}
+
+function showScanCompletion(totals, failed) {
+  const message = document.getElementById('scan-complete-message');
+  const actions = document.getElementById('scan-actions');
+  const hasErrors = failed || (totals.errors || 0) > 0;
+  if (message) {
+    message.className = 'scan-complete-message ' + (hasErrors ? 'scan-complete-warning' : 'scan-complete-success');
+    message.textContent = hasErrors
+      ? 'Scan finished with ' + (totals.errors || 0) + ' error' + ((totals.errors || 0) === 1 ? '' : 's') + '.'
+      : 'Scan complete. Closing automatically...';
+  }
+  if (actions) actions.classList.remove('hidden');
+  showToast(hasErrors ? 'Scan finished with errors' : 'All repositories scanned', hasErrors ? 'error' : 'success');
+
+  if (!hasErrors) {
+    scanCloseTimer = setTimeout(() => {
+      closeModal('modal-scan');
+      scanCloseTimer = null;
+    }, 1800);
+  }
 }
 
 function clearAddForm() {
@@ -758,6 +798,10 @@ function openModal(id) {
 function closeModal(id) {
   document.getElementById(id).classList.add('hidden');
   if (id === 'modal-add') clearAddForm();
+  if (id === 'modal-scan' && scanCloseTimer) {
+    clearTimeout(scanCloseTimer);
+    scanCloseTimer = null;
+  }
 }
 
 function showError(elementId, message) {
