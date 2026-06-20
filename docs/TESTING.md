@@ -67,5 +67,6 @@ test "parse_git_status clean repo" {
 ## Current Status
 
 - Scanner unit tests, registry CRUD tests, and integration tests already live in `tests/`.
-- Regression coverage now includes escaped setting values, opt-in boolean setting normalization, shell-quoted paths, local `.git` marker validation, latest-snapshot file changes, duplicate commit handling, GitHub remote parsing, and Dependabot alert count parsing.
+- Regression coverage now includes escaped setting values, opt-in boolean setting normalization, shell-quoted paths, local `.git` marker validation, latest-snapshot file changes, bounded scan-history trimming, duplicate commit handling, GitHub remote parsing, and Dependabot alert count parsing.
+- This pass also smoke-verified localhost CORS reflection and defensive browser headers against a running server.
 - The next useful step is to grow edge-case coverage and wire the suites into CI.

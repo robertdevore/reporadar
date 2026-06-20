@@ -14,6 +14,7 @@ RepoRadar is a local-first Git repository dashboard built in the Kujo programmin
 - Shows file-level changes, recent commits, and activity trends
 - Supports add, remove, pin, archive, discovery, scan, export, and restore workflows
 - Preserves shareable dashboard views with status, group, tag, search, and sort URL parameters
+- Keeps scan history bounded so long-running registries stay responsive
 - Optionally shows GitHub Dependabot alert counts when explicitly enabled and authenticated through `gh`
 - Serves dashboard, detail, activity, discovery, and settings views
 - Stores everything locally in SQLite with no telemetry or cloud dependency
@@ -95,10 +96,13 @@ kujo test
 ## Security model
 
 - Binds to `127.0.0.1` only
+- Limits browser CORS reflection to localhost origins
+- Sends defensive browser headers for content type sniffing, referrer leakage, and framing
 - Uses read-only Git inspection commands
 - Avoids telemetry, analytics, and remote data upload
 - Keeps secrets and repo metadata in local SQLite storage
 - Escapes SQL and shell-sensitive values in the scan and persistence paths
+- Rejects static path traversal attempts before serving browser assets
 - Keeps remote security enrichment opt-in; Dependabot alert checks require the user to enable them and authenticate `gh`
 
 ## Documentation
@@ -120,4 +124,4 @@ kujo test
 
 ## Status
 
-The project is useful and increasingly polished, but not yet "enterprise complete" in the universal sense. The next hardening pass should focus on CI, broader platform testing, auth/threat-model decisions for non-local deployments, and measured scan performance. See `docs/NEXT_SESSION_ENTERPRISE_REVIEW_2026-06-19.md` for the newest follow-up list.
+The project is useful and increasingly polished, but not yet "enterprise complete" in the universal sense. The next hardening pass should focus on CI, broader platform testing, auth/threat-model decisions for non-local deployments, and measured scan performance. See `docs/NEXT_SESSION_ENTERPRISE_REVIEW_2026-06-20.md` for the newest follow-up list.

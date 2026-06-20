@@ -32,8 +32,15 @@
 - Server binds to `127.0.0.1` exclusively
 - Vanilla JS frontend with no framework dependencies
 - Kujo-first implementation using native builtins
+- Dashboard summary cards fill the available row on desktop and collapse into a compact two-column grid on mobile
+- Scan snapshot and file-change history is bounded per repository to keep long-lived local databases responsive
+- Integration tests now use the current repository path instead of an absolute machine-specific path
 
 ### SECURITY
 - Read-only Git commands only
 - No telemetry or data collection
 - Local-only architecture
+- CORS origin reflection is limited to localhost origins
+- Static asset serving rejects traversal-shaped paths
+- Responses include defensive browser security headers
+- Dashboard row action handlers no longer embed repository JSON or names in inline JavaScript

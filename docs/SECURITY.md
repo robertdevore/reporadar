@@ -49,20 +49,23 @@ Leave this setting disabled for fully offline/local-only operation or environmen
 - Git repo validation via `git rev-parse --is-inside-work-tree`
 - SQL values are escaped via the shared `escape_sql(...)` helper
 - JSON import validates structure before processing
-- Path traversal is prevented by filesystem API design
+- Static asset requests reject `..` segments and backslashes before touching the filesystem
 
 ## Data Storage
 
 - SQLite database at `~/.reporadar.db` (configurable via `REPORADAR_DB`)
 - No credentials or tokens stored
 - Commit messages and repo paths are the most sensitive data stored
+- Scan snapshots and file-change rows are trimmed to the newest 250 snapshots per repository to keep long-lived registries bounded
 - Database can be backed up and restored via Settings page
 
 ## Frontend
 
 - Static HTML/CSS/JS with no external CDN dependencies
 - Content is escaped (`escHtml`) before rendering to prevent XSS
-- CORS headers are permissive for local development only
+- Dashboard action buttons resolve repositories by numeric ID instead of embedding repository JSON in inline handlers
+- CORS headers only reflect same-machine browser origins (`127.0.0.1`, `localhost`, and `[::1]`)
+- Responses include defensive browser headers: `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, and a local-only Content Security Policy
 
 ## Reporting Issues
 
