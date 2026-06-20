@@ -160,8 +160,21 @@ export func store_scan_result(db, repo_id, scan_data) {
 
 	// Update repo last_scan_at and last_error
 	db_execute(db, "UPDATE repos SET last_scan_at = datetime('now'), last_error = '" + safe_error + "', updated_at = datetime('now') WHERE id = " + to_string(repo_id))
+	trim_repo_history(db, repo_id, 250)
 
 	return snapshot_id
+}
+
+/// trim_repo_history keeps recent scan snapshots bounded for long-lived registries.
+export func trim_repo_history(db, repo_id, max_snapshots) {
+	if max_snapshots <= 0 {
+		return
+	}
+	mut repo_id_str = to_string(repo_id)
+	mut max_str = to_string(max_snapshots)
+	mut old_snapshot_query = "SELECT id FROM repo_status_snapshots WHERE repo_id = " + repo_id_str + " ORDER BY scanned_at DESC, id DESC LIMIT -1 OFFSET " + max_str
+	db_execute(db, "DELETE FROM repo_file_changes WHERE snapshot_id IN (" + old_snapshot_query + ")")
+	db_execute(db, "DELETE FROM repo_status_snapshots WHERE id IN (" + old_snapshot_query + ")")
 }
 
 /// get_repo_file_changes returns file changes for a repo's latest snapshot.

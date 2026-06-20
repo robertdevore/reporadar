@@ -5,19 +5,75 @@ from src.db import init_db, get_db_path, get_setting, set_setting, escape_sql
 from src.scanner import validate_git_repo, validate_repo_path, get_canonical_path, scan_repo_with_options, collect_recent_commits
 from src.registry import add_repo, remove_repo, update_repo, get_all_repos, get_repo_by_id, store_scan_result, store_repo_commits, get_repo_file_changes, get_repo_scan_history, get_repo_commits, get_commits_in_window, get_commits_by_day, get_commit_count_per_repo
 
-/// cors_headers returns common CORS headers for local development.
-export func cors_headers() {
+/// is_allowed_origin returns true for same-machine browser origins.
+export func is_allowed_origin(origin) {
+	if origin == null || origin == "" {
+		return true
+	}
+	if origin == "http://127.0.0.1" || starts_with(origin, "http://127.0.0.1:") {
+		return true
+	}
+	if origin == "http://localhost" || starts_with(origin, "http://localhost:") {
+		return true
+	}
+	if origin == "http://[::1]" || starts_with(origin, "http://[::1]:") {
+		return true
+	}
+	return false
+}
+
+/// request_origin returns the Origin header when the Kujo HTTP layer exposes it.
+export func request_origin(req) {
+	mut headers = get_default(req, "headers", {})
+	mut origin = get_default(headers, "Origin", "")
+	if origin == "" {
+		origin = get_default(headers, "origin", "")
+	}
+	return origin
+}
+
+/// cors_headers returns CORS headers limited to localhost browser origins.
+export func cors_headers(req) {
+	mut origin = request_origin(req)
+	mut allowed_origin = "http://127.0.0.1"
+	if is_allowed_origin(origin) && origin != "" {
+		allowed_origin = origin
+	}
 	return {
-		"Access-Control-Allow-Origin": "*",
+		"Access-Control-Allow-Origin": allowed_origin,
 		"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-		"Access-Control-Allow-Headers": "Content-Type"
+		"Access-Control-Allow-Headers": "Content-Type",
+		"Vary": "Origin"
+	}
+}
+
+/// security_headers returns defense-in-depth browser security headers.
+export func security_headers() {
+	return {
+		"X-Content-Type-Options": "nosniff",
+		"Referrer-Policy": "no-referrer",
+		"X-Frame-Options": "DENY",
+		"Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:* http://localhost:*; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 	}
 }
 
 /// handle_options handles CORS preflight requests.
 export func handle_options(req) {
 	mut resp = http_response(204, "")
-	mut headers = cors_headers()
+	mut headers = cors_headers(req)
+	mut hkeys = keys(headers)
+	mut i = 0
+	while i < len(hkeys) {
+		mut k = hkeys[i]
+		resp = set_header(resp, k, headers[k])
+		i = i + 1
+	}
+	return add_security_headers(resp)
+}
+
+/// add_security_headers adds browser security headers to a response.
+export func add_security_headers(resp) {
+	mut headers = security_headers()
 	mut hkeys = keys(headers)
 	mut i = 0
 	while i < len(hkeys) {
@@ -29,8 +85,8 @@ export func handle_options(req) {
 }
 
 /// add_cors adds CORS headers to a response.
-export func add_cors(resp) {
-	mut headers = cors_headers()
+export func add_cors(resp, req) {
+	mut headers = cors_headers(req)
 	mut hkeys = keys(headers)
 	mut i = 0
 	while i < len(hkeys) {
@@ -38,7 +94,7 @@ export func add_cors(resp) {
 		resp = set_header(resp, k, headers[k])
 		i = i + 1
 	}
-	return resp
+	return add_security_headers(resp)
 }
 
 /// api_list_repos returns all tracked repos with latest status.
@@ -56,7 +112,7 @@ export func api_list_repos(req) {
 		"total": len(repos)
 	}
 
-	return add_cors(json_response(200, result))
+	return add_cors(json_response(200, result), req)
 }
 
 /// api_add_repo handles POST to add a new repo.
@@ -66,7 +122,7 @@ export func api_add_repo(req) {
 	}
 
 	if req["method"] != "POST" {
-		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}))
+		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
 
 	mut body = req["body"]
@@ -74,7 +130,7 @@ export func api_add_repo(req) {
 
 	mut path = get(data, "path")
 	if path == null || path == "" {
-		return add_cors(json_response(400, {"success": false, "error": "Path is required"}))
+		return add_cors(json_response(400, {"success": false, "error": "Path is required"}), req)
 	}
 
 	mut display_name = get_default(data, "display_name", "")
@@ -86,7 +142,7 @@ export func api_add_repo(req) {
 	mut db = init_db()
 	mut result = add_repo(db, path, display_name, group_name, tags, notes, pinned)
 
-	return add_cors(json_response(200, result))
+	return add_cors(json_response(200, result), req)
 }
 
 /// api_remove_repo handles DELETE to remove a repo.
@@ -96,20 +152,20 @@ export func api_remove_repo(req) {
 	}
 
 	if req["method"] != "DELETE" {
-		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}))
+		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
 
 	mut params = req["params"]
 	mut repo_id_str = get(params, "id")
 	if repo_id_str == null {
-		return add_cors(json_response(400, {"success": false, "error": "Repo ID is required"}))
+		return add_cors(json_response(400, {"success": false, "error": "Repo ID is required"}), req)
 	}
 
 	mut repo_id = parse_int(repo_id_str)
 	mut db = init_db()
 	mut result = remove_repo(db, repo_id)
 
-	return add_cors(json_response(200, result))
+	return add_cors(json_response(200, result), req)
 }
 
 /// api_update_repo handles PUT to update repo metadata.
@@ -119,13 +175,13 @@ export func api_update_repo(req) {
 	}
 
 	if req["method"] != "PUT" {
-		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}))
+		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
 
 	mut params = req["params"]
 	mut repo_id_str = get(params, "id")
 	if repo_id_str == null {
-		return add_cors(json_response(400, {"success": false, "error": "Repo ID is required"}))
+		return add_cors(json_response(400, {"success": false, "error": "Repo ID is required"}), req)
 	}
 
 	mut repo_id = parse_int(repo_id_str)
@@ -142,7 +198,7 @@ export func api_update_repo(req) {
 	mut db = init_db()
 	mut result = update_repo(db, repo_id, display_name, group_name, tags, notes, pinned, archived)
 
-	return add_cors(json_response(200, result))
+	return add_cors(json_response(200, result), req)
 }
 
 /// api_scan_repo handles POST to scan a single repo.
@@ -152,13 +208,13 @@ export func api_scan_repo(req) {
 	}
 
 	if req["method"] != "POST" {
-		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}))
+		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
 
 	mut params = req["params"]
 	mut repo_id_str = get(params, "id")
 	if repo_id_str == null {
-		return add_cors(json_response(400, {"success": false, "error": "Repo ID is required"}))
+		return add_cors(json_response(400, {"success": false, "error": "Repo ID is required"}), req)
 	}
 
 	mut repo_id = parse_int(repo_id_str)
@@ -167,7 +223,7 @@ export func api_scan_repo(req) {
 	// Get the repo path
 	mut repo = get_repo_by_id(db, repo_id)
 	if repo == null {
-		return add_cors(json_response(404, {"success": false, "error": "Repo not found"}))
+		return add_cors(json_response(404, {"success": false, "error": "Repo not found"}), req)
 	}
 
 	mut repo_path = repo["path"]
@@ -199,7 +255,7 @@ export func api_scan_repo(req) {
 		"scan_result": scan_result,
 		"file_changes": file_changes,
 		"snapshot_id": snapshot_id
-	}))
+	}), req)
 }
 
 /// api_repo_detail returns detailed info for a single repo.
@@ -211,7 +267,7 @@ export func api_repo_detail(req) {
 	mut params = req["params"]
 	mut repo_id_str = get(params, "id")
 	if repo_id_str == null {
-		return add_cors(json_response(400, {"success": false, "error": "Repo ID is required"}))
+		return add_cors(json_response(400, {"success": false, "error": "Repo ID is required"}), req)
 	}
 
 	mut repo_id = parse_int(repo_id_str)
@@ -219,7 +275,7 @@ export func api_repo_detail(req) {
 
 	mut repo = get_repo_by_id(db, repo_id)
 	if repo == null {
-		return add_cors(json_response(404, {"success": false, "error": "Repo not found"}))
+		return add_cors(json_response(404, {"success": false, "error": "Repo not found"}), req)
 	}
 
 	mut file_changes = get_repo_file_changes(db, repo_id)
@@ -232,7 +288,7 @@ export func api_repo_detail(req) {
 		"file_changes": file_changes,
 		"recent_commits": recent_commits,
 		"scan_history": scan_history
-	}))
+	}), req)
 }
 
 /// api_dashboard_summary returns summary counts for the dashboard header.
@@ -326,7 +382,7 @@ export func api_dashboard_summary(req) {
 		summary["stale"] = stale_rows[0]["stale_count"]
 	}
 
-	return add_cors(json_response(200, {"success": true, "summary": summary}))
+	return add_cors(json_response(200, {"success": true, "summary": summary}), req)
 }
 
 /// api_activity returns commit activity data.
@@ -411,7 +467,7 @@ export func api_activity(req) {
 		"least_active": least_active,
 		"stale_repos": stale_repos,
 		"recent_commits": slice(commits, 0, 50)
-	}))
+	}), req)
 }
 
 /// api_bulk_scan performs a full scan of all tracked repos.
@@ -421,7 +477,7 @@ export func api_bulk_scan(req) {
 	}
 
 	if req["method"] != "POST" {
-		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}))
+		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
 
 	mut db = init_db()
@@ -476,7 +532,7 @@ export func api_bulk_scan(req) {
 	// Update scan run record
 	db_execute(db, "UPDATE scan_runs SET completed_at = datetime('now'), success_count = " + to_string(results["scanned"]) + ", error_count = " + to_string(results["errors"]) + ", clean_count = " + to_string(results["clean"]) + ", dirty_count = " + to_string(results["dirty"]) + " WHERE id = " + to_string(run_id))
 
-	return add_cors(json_response(200, results))
+	return add_cors(json_response(200, results), req)
 }
 
 /// api_discover searches for Git repos under a parent directory.
@@ -486,7 +542,7 @@ export func api_discover(req) {
 	}
 
 	if req["method"] != "POST" {
-		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}))
+		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
 
 	mut body = req["body"]
@@ -494,7 +550,7 @@ export func api_discover(req) {
 
 	mut parent_path = get(data, "path")
 	if parent_path == null || parent_path == "" {
-		return add_cors(json_response(400, {"success": false, "error": "Parent path is required"}))
+		return add_cors(json_response(400, {"success": false, "error": "Parent path is required"}), req)
 	}
 
 	mut max_depth = parse_int(to_string(get_default(data, "max_depth", 3)))
@@ -540,7 +596,7 @@ export func api_discover(req) {
 		"total_found": len(discovered),
 		"new_repos": new_repos,
 		"already_tracked": len(discovered) - len(new_repos)
-	}))
+	}), req)
 }
 
 /// discover_repos recursively searches for .git directories.
@@ -616,14 +672,14 @@ export func api_bulk_add(req) {
 	}
 
 	if req["method"] != "POST" {
-		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}))
+		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
 
 	mut body = req["body"]
 	mut data = parse_json(body)
 	mut repos_to_add = get(data, "repos")
 	if repos_to_add == null {
-		return add_cors(json_response(400, {"success": false, "error": "Repos array is required"}))
+		return add_cors(json_response(400, {"success": false, "error": "Repos array is required"}), req)
 	}
 
 	mut db = init_db()
@@ -656,7 +712,7 @@ export func api_bulk_add(req) {
 		results["details"] = push(results["details"], result)
 	}
 
-	return add_cors(json_response(200, results))
+	return add_cors(json_response(200, results), req)
 }
 
 /// api_settings_get returns all settings.
@@ -674,7 +730,7 @@ export func api_settings_get(req) {
 		i = i + 1
 	}
 
-	return add_cors(json_response(200, {"success": true, "settings": settings}))
+	return add_cors(json_response(200, {"success": true, "settings": settings}), req)
 }
 
 /// api_settings_update updates multiple settings.
@@ -684,14 +740,14 @@ export func api_settings_update(req) {
 	}
 
 	if req["method"] != "PUT" {
-		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}))
+		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
 
 	mut body = req["body"]
 	mut data = parse_json(body)
 	mut settings = get(data, "settings")
 	if settings == null {
-		return add_cors(json_response(400, {"success": false, "error": "Settings object is required"}))
+		return add_cors(json_response(400, {"success": false, "error": "Settings object is required"}), req)
 	}
 
 	mut db = init_db()
@@ -704,7 +760,7 @@ export func api_settings_update(req) {
 		i = i + 1
 	}
 
-	return add_cors(json_response(200, {"success": true}))
+	return add_cors(json_response(200, {"success": true}), req)
 }
 
 /// api_export returns the full registry as JSON for export.
@@ -736,7 +792,7 @@ export func api_export(req) {
 		export_data["exported_at"] = exported_rows[0]["exported_at"]
 	}
 
-	mut resp = add_cors(json_response(200, export_data))
+	mut resp = add_cors(json_response(200, export_data), req)
 	resp = set_header(resp, "Content-Disposition", "attachment; filename=\"reporadar-export.json\"")
 	return resp
 }
@@ -748,7 +804,7 @@ export func api_import(req) {
 	}
 
 	if req["method"] != "POST" {
-		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}))
+		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
 
 	mut body = req["body"]
@@ -756,12 +812,12 @@ export func api_import(req) {
 
 	// Validate structure
 	if get(data, "app") != "reporadar" {
-		return add_cors(json_response(400, {"success": false, "error": "Invalid import file: not a RepoRadar export"}))
+		return add_cors(json_response(400, {"success": false, "error": "Invalid import file: not a RepoRadar export"}), req)
 	}
 
 	mut imported_repos = get(data, "repos")
 	if imported_repos == null {
-		return add_cors(json_response(400, {"success": false, "error": "Invalid import file: no repos found"}))
+		return add_cors(json_response(400, {"success": false, "error": "Invalid import file: no repos found"}), req)
 	}
 
 	mut db = init_db()
@@ -824,7 +880,7 @@ export func api_import(req) {
 		}
 	}
 
-	return add_cors(json_response(200, results))
+	return add_cors(json_response(200, results), req)
 }
 
 /// api_export_db backs up the database file.
@@ -835,14 +891,14 @@ export func api_export_db(req) {
 
 	mut db_path = get_db_path()
 	if !file_exists(db_path) {
-		return add_cors(json_response(404, {"success": false, "error": "Database file not found"}))
+		return add_cors(json_response(404, {"success": false, "error": "Database file not found"}), req)
 	}
 
 	mut content = read_file(db_path)
 	mut resp = http_response(200, content)
 	resp = set_header(resp, "Content-Type", "application/octet-stream")
 	resp = set_header(resp, "Content-Disposition", "attachment; filename=\"reporadar-backup.db\"")
-	return add_cors(resp)
+	return add_cors(resp, req)
 }
 
 // === Static file serving ===
@@ -859,6 +915,20 @@ export func get_mime_type(filename) {
 	return "application/octet-stream"
 }
 
+/// has_static_path_traversal rejects paths that could escape static/.
+export func has_static_path_traversal(url_path) {
+	if contains(url_path, "..") == 1 {
+		return true
+	}
+	if contains(url_path, "\\") == 1 {
+		return true
+	}
+	if contains(url_path, "%2e") == 1 || contains(url_path, "%2E") == 1 || contains(url_path, "%5c") == 1 || contains(url_path, "%5C") == 1 {
+		return true
+	}
+	return false
+}
+
 /// serve_static serves a static file from the static/ directory.
 export func serve_static(req) {
 	if req["method"] == "OPTIONS" {
@@ -866,6 +936,9 @@ export func serve_static(req) {
 	}
 
 	mut url_path = req["path"]
+	if has_static_path_traversal(url_path) {
+		return add_cors(json_response(400, {"success": false, "error": "Invalid static path"}), req)
+	}
 
 	// Determine file path
 	mut file_path = ""
@@ -886,9 +959,9 @@ export func serve_static(req) {
 			mut content = read_file("static/index.html")
 			mut resp = http_response(200, content)
 			resp = set_header(resp, "Content-Type", "text/html")
-			return add_cors(resp)
+			return add_cors(resp, req)
 		}
-		return add_cors(json_response(404, {"success": false, "error": "Not found"}))
+		return add_cors(json_response(404, {"success": false, "error": "Not found"}), req)
 	}
 
 	mut content = read_file(file_path)
@@ -897,7 +970,7 @@ export func serve_static(req) {
 	resp = set_header(resp, "Content-Type", mime)
 	// Cache busting for dev
 	resp = set_header(resp, "Cache-Control", "no-cache")
-	return add_cors(resp)
+	return add_cors(resp, req)
 }
 
 // === API routes mapping ===
