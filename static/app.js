@@ -1,6 +1,11 @@
 // RepoRadar — Dashboard Frontend App
 
 const API_BASE = '';
+const SCAN_ALL_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>';
+const LOADER_ICON = '<svg class="spin-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>';
+const CHECK_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+const X_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+const DOT_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="4"/></svg>';
 
 let allRepos = [];
 let sortColumn = 'name';
@@ -365,32 +370,106 @@ async function startBulkScan() {
 
   const scanButton = document.getElementById('btn-scan-all');
   scanButton.disabled = true;
-  scanButton.innerHTML = '<span style="margin-right:6px;">⏳</span> Scanning...';
+  scanButton.innerHTML = LOADER_ICON + ' Scanning...';
 
   openModal('modal-scan');
   document.getElementById('progress-bar').style.width = '0%';
   document.getElementById('scan-current').textContent = 'Starting scan...';
-  document.getElementById('scan-stats').textContent = '';
+  document.getElementById('scan-stats').textContent = '0 of ' + allRepos.length + ' repos scanned';
+  initializeScanLog(allRepos);
 
+  const totals = { scanned: 0, clean: 0, dirty: 0, errors: 0 };
   try {
-    const result = await apiFetch('/api/scan/bulk', { method: 'POST' });
+    for (let i = 0; i < allRepos.length; i += 1) {
+      const repo = allRepos[i];
+      const repoName = repo.display_name || repo.name || repo.path || ('Repo ' + repo.id);
+      updateBulkScanProgress(i, allRepos.length, totals, 'Scanning ' + repoName + '...');
+      updateScanLog(repo, 'running', 'Scanning');
+
+      try {
+        const result = await apiFetch('/api/repos/' + repo.id + '/scan', { method: 'POST' });
+        if (result.repo) {
+          replaceRepoInMemory(result.repo);
+        }
+        if (result.success) {
+          totals.scanned += 1;
+          if (result.repo && result.repo.is_clean === 1) {
+            totals.clean += 1;
+            updateScanLog(result.repo || repo, 'clean', 'Clean');
+          } else {
+            totals.dirty += 1;
+            updateScanLog(result.repo || repo, 'dirty', 'Dirty');
+          }
+        } else {
+          totals.errors += 1;
+          const error = result.scan_result?.error || 'Scan failed';
+          updateScanLog(result.repo || repo, 'error', error);
+        }
+      } catch (err) {
+        totals.errors += 1;
+        updateScanLog(repo, 'error', 'Server error');
+      }
+
+      updateBulkScanProgress(i + 1, allRepos.length, totals, 'Scanned ' + (i + 1) + ' of ' + allRepos.length);
+      renderTable(false);
+    }
+
     document.getElementById('progress-bar').style.width = '100%';
     document.getElementById('scan-current').textContent = 'Scan complete!';
-    document.getElementById('scan-stats').textContent =
-      result.scanned + ' scanned, ' + (result.clean || 0) + ' clean, ' + (result.dirty || 0) + ' dirty, ' + result.errors + ' errors out of ' + result.total + ' repos';
-
-    setTimeout(() => {
-      closeModal('modal-scan');
-      loadRepos();
-      loadSummary();
-    }, 2000);
+    document.getElementById('scan-stats').textContent = formatBulkScanStats(totals, allRepos.length);
+    await Promise.all([loadRepos(), loadSummary()]);
+    loadFilterOptions();
   } catch (err) {
     document.getElementById('scan-current').textContent = 'Scan failed';
     document.getElementById('scan-stats').textContent = 'Server connection error';
   } finally {
     scanButton.disabled = false;
-    scanButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg> Scan All';
+    scanButton.innerHTML = SCAN_ALL_ICON + ' Scan All';
   }
+}
+
+function initializeScanLog(repos) {
+  const log = document.getElementById('scan-log');
+  if (!log) return;
+  log.innerHTML = repos.map(repo => {
+    const repoName = repo.display_name || repo.name || repo.path || ('Repo ' + repo.id);
+    return '<div class="scan-log-row pending" data-repo-id="' + escAttr(repo.id) + '">' +
+      '<span class="scan-log-icon">' + DOT_ICON + '</span>' +
+      '<span class="scan-log-name" title="' + escAttr(repo.path || repoName) + '">' + escHtml(repoName) + '</span>' +
+      '<span class="scan-log-meta">Queued</span>' +
+    '</div>';
+  }).join('');
+  log.scrollTop = 0;
+}
+
+function updateScanLog(repo, state, meta) {
+  const log = document.getElementById('scan-log');
+  if (!log || !repo) return;
+  const row = log.querySelector('[data-repo-id="' + String(repo.id).replace(/"/g, '\\"') + '"]');
+  if (!row) return;
+  row.className = 'scan-log-row ' + state;
+  const icon = state === 'running' ? LOADER_ICON : (state === 'error' ? X_ICON : (state === 'pending' ? DOT_ICON : CHECK_ICON));
+  const iconEl = row.querySelector('.scan-log-icon');
+  const metaEl = row.querySelector('.scan-log-meta');
+  if (iconEl) iconEl.innerHTML = icon;
+  if (metaEl) metaEl.textContent = meta || state;
+  row.scrollIntoView({ block: 'nearest' });
+}
+
+function updateBulkScanProgress(done, total, totals, currentText) {
+  const percent = total > 0 ? Math.round((done / total) * 100) : 100;
+  document.getElementById('progress-bar').style.width = percent + '%';
+  document.getElementById('scan-current').textContent = currentText;
+  document.getElementById('scan-stats').textContent = formatBulkScanStats(totals, total);
+}
+
+function formatBulkScanStats(totals, total) {
+  return totals.scanned + ' scanned, ' + totals.clean + ' clean, ' + totals.dirty + ' dirty, ' + totals.errors + ' errors out of ' + total + ' repos';
+}
+
+function replaceRepoInMemory(updatedRepo) {
+  const updatedId = Number(updatedRepo.id);
+  allRepos = allRepos.map(repo => Number(repo.id) === updatedId ? updatedRepo : repo);
 }
 
 function clearAddForm() {
