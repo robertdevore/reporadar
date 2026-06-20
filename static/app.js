@@ -308,6 +308,12 @@ async function removeRepo(repoId, name) {
   }
 }
 
+function removeRepoById(repoId) {
+  const repo = findRepoById(repoId);
+  if (!repo) return;
+  removeRepo(repo.id, repo.display_name || repo.name || 'this repository');
+}
+
 function openEditModal(repo) {
   document.getElementById('edit-id').value = repo.id;
   document.getElementById('edit-name').value = repo.display_name || repo.name || '';
@@ -315,6 +321,11 @@ function openEditModal(repo) {
   document.getElementById('edit-tags').value = repo.tags || '';
   document.getElementById('edit-notes').value = repo.notes || '';
   openModal('modal-edit');
+}
+
+function openEditModalById(repoId) {
+  const repo = findRepoById(repoId);
+  if (repo) openEditModal(repo);
 }
 
 async function saveEdit() {
@@ -523,6 +534,7 @@ function renderRow(repo) {
     : '';
   const lastCommitHtml = commitDate === '-' && !commitHtml ? '-' : (commitHtml ? commitHtml + '<span class="muted-cell"> ' + commitDate + '</span>' : commitDate);
   const alertHtml = renderDependabotAlerts(repo.dependabot_alert_count);
+  const repoId = Number(repo.id) || 0;
 
   const tags = (repo.tags || '').split(',').filter(t => t.trim()).map(t =>
     '<span class="tag">' + escHtml(t.trim()) + '</span>'
@@ -539,7 +551,7 @@ function renderRow(repo) {
     <tr class="${rowClass}">
       <td><span class="status-dot ${statusDot}" title="${statusDot}"></span></td>
       <td>
-        <a href="/detail.html?id=${repo.id}" class="repo-link">${escHtml(name)}</a>
+        <a href="/detail.html?id=${repoId}" class="repo-link">${escHtml(name)}</a>
         ${repo.pinned === 1 ? '<span class="badge badge-pinned">★</span>' : ''}
       </td>
       <td>${escHtml(repo.group_name || '-')}</td>
@@ -555,9 +567,9 @@ function renderRow(repo) {
       <td title="${escAttr(repo.latest_commit_message || '')}">${lastCommitHtml}</td>
       <td>${scanDate}</td>
       <td class="action-cell">
-        <button class="btn btn-sm btn-secondary" onclick="scanRepo(${repo.id})" title="Scan"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
-        <button class="btn btn-sm btn-secondary" onclick="openEditModal(${JSON.stringify(repo).replace(/"/g, '&quot;')})" title="Edit"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 21h8"/><path d="m15 5 4 4"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg></button>
-        <button class="btn btn-sm btn-secondary" onclick="removeRepo(${repo.id}, '${escHtml(name).replace(/'/g, "\\'")}')" title="Remove"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        <button class="btn btn-sm btn-secondary" onclick="scanRepo(${repoId})" title="Scan"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
+        <button class="btn btn-sm btn-secondary" onclick="openEditModalById(${repoId})" title="Edit"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 21h8"/><path d="m15 5 4 4"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg></button>
+        <button class="btn btn-sm btn-secondary" onclick="removeRepoById(${repoId})" title="Remove"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
       </td>
     </tr>
   `;
@@ -653,6 +665,11 @@ function escHtml(str) {
 
 function escAttr(str) {
   return escHtml(str).replace(/'/g, '&#39;');
+}
+
+function findRepoById(repoId) {
+  const wanted = Number(repoId);
+  return allRepos.find(r => Number(r.id) === wanted);
 }
 
 function openModal(id) {
