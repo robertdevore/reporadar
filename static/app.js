@@ -565,7 +565,7 @@ function renderTable(syncUrl = true) {
   if (repos.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="15" style="text-align:center;padding:32px;color:var(--text-muted);">
+        <td colspan="14" style="text-align:center;padding:32px;color:var(--charcoal);">
           No repositories match the current filters.
         </td>
       </tr>
@@ -642,16 +642,13 @@ function renderRow(repo) {
 
   const name = repo.display_name || repo.name || '?';
   const branch = repo.branch || (repo.is_detached === 1 ? '(detached)' : '-');
-  const commitDate = repo.latest_commit_date ? formatDate(repo.latest_commit_date) : '-';
-  const scanDate = repo.scanned_at ? formatDate(repo.scanned_at) : 'Never';
   const ahead = repo.ahead_count || 0;
   const behind = repo.behind_count || 0;
   const commitUrl = hostedCommitUrl(repo.remote_url, repo.latest_commit_hash);
   const commitLabel = repo.latest_commit_short_hash || '';
-  const commitHtml = commitLabel
+  const lastCommitHtml = commitLabel
     ? (commitUrl ? '<a href="' + escAttr(commitUrl) + '" target="_blank" rel="noopener" class="commit-hash-link">' + escHtml(commitLabel) + '</a>' : '<span class="commit-hash">' + escHtml(commitLabel) + '</span>')
-    : '';
-  const lastCommitHtml = commitDate === '-' && !commitHtml ? '-' : (commitHtml ? commitHtml + '<span class="muted-cell"> ' + commitDate + '</span>' : commitDate);
+    : '-';
   const alertHtml = renderDependabotAlerts(repo.dependabot_alert_count);
   const repoId = Number(repo.id) || 0;
 
@@ -684,7 +681,6 @@ function renderRow(repo) {
       <td>${behindHtml}</td>
       <td>${alertHtml}</td>
       <td title="${escAttr(repo.latest_commit_message || '')}">${lastCommitHtml}</td>
-      <td>${scanDate}</td>
       <td class="action-cell">
         <button class="btn btn-sm btn-secondary" onclick="scanRepo(${repoId})" title="Scan"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
         <button class="btn btn-sm btn-secondary" onclick="openEditModalById(${repoId})" title="Edit"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 21h8"/><path d="m15 5 4 4"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg></button>

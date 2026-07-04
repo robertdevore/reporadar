@@ -76,9 +76,9 @@ function renderDetail(data) {
     fileSection = `
       <div class="card card-full">
         <h3>📁 File Changes (${fileChanges.length})</h3>
-        ${stagedFiles.length > 0 ? '<h4 style="color:var(--accent-green);margin-top:8px;">Staged (' + stagedFiles.length + ')</h4><div class="file-list">' + renderFiles(stagedFiles) + '</div>' : ''}
-        ${unstagedFiles.length > 0 ? '<h4 style="color:var(--accent-orange);margin-top:8px;">Unstaged (' + unstagedFiles.length + ')</h4><div class="file-list">' + renderFiles(unstagedFiles) + '</div>' : ''}
-        ${untrackedFiles.length > 0 ? '<h4 style="color:var(--text-muted);margin-top:8px;">Untracked (' + untrackedFiles.length + ')</h4><div class="file-list">' + renderFiles(untrackedFiles) + '</div>' : ''}
+        ${stagedFiles.length > 0 ? '<h4 style="color:var(--success);margin-top:8px;">Staged (' + stagedFiles.length + ')</h4><div class="file-list">' + renderFiles(stagedFiles) + '</div>' : ''}
+        ${unstagedFiles.length > 0 ? '<h4 style="color:var(--warning);margin-top:8px;">Unstaged (' + unstagedFiles.length + ')</h4><div class="file-list">' + renderFiles(unstagedFiles) + '</div>' : ''}
+        ${untrackedFiles.length > 0 ? '<h4 style="color:var(--charcoal);margin-top:8px;">Untracked (' + untrackedFiles.length + ')</h4><div class="file-list">' + renderFiles(untrackedFiles) + '</div>' : ''}
       </div>
     `;
   }

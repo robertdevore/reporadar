@@ -53,7 +53,7 @@ async function loadActivity(days) {
 function renderChart(commitsByDay) {
   const container = document.getElementById('chart-container');
   if (commitsByDay.length === 0) {
-    container.innerHTML = '<p style="color:var(--text-muted);text-align:center;">No commits in this window</p>';
+    container.innerHTML = '<p style="color:var(--charcoal);text-align:center;">No commits in this window</p>';
     return;
   }
 
@@ -75,7 +75,7 @@ function renderChart(commitsByDay) {
 function renderMostActive(repos) {
   const container = document.getElementById('most-active');
   if (repos.length === 0) {
-    container.innerHTML = '<p style="color:var(--text-muted);">No active repos</p>';
+    container.innerHTML = '<p style="color:var(--charcoal);">No active repos</p>';
     return;
   }
   container.innerHTML = repos.map(r => `
@@ -89,7 +89,7 @@ function renderMostActive(repos) {
 function renderLeastActive(repos) {
   const container = document.getElementById('least-active');
   if (repos.length === 0) {
-    container.innerHTML = '<p style="color:var(--text-muted);">No repos with low activity</p>';
+    container.innerHTML = '<p style="color:var(--charcoal);">No repos with low activity</p>';
     return;
   }
   container.innerHTML = repos.map(r => `
@@ -103,13 +103,13 @@ function renderLeastActive(repos) {
 function renderStale(repos) {
   const container = document.getElementById('stale-repos');
   if (repos.length === 0) {
-    container.innerHTML = '<p style="color:var(--accent-green);">All repos have recent activity 🎉</p>';
+    container.innerHTML = '<p style="color:var(--success);">All repos have recent activity 🎉</p>';
     return;
   }
   container.innerHTML = repos.slice(0, 10).map(r => `
     <div class="repo-row">
       <span>${escHtml(r.name)}</span>
-      <span style="color:var(--text-muted);font-size:12px;">${r.last_commit_date ? 'Last: ' + r.last_commit_date.slice(0,10) : 'Never'}</span>
+      <span style="color:var(--charcoal);font-size:12px;">${r.last_commit_date ? 'Last: ' + r.last_commit_date.slice(0,10) : 'Never'}</span>
     </div>
   `).join('');
 }
@@ -117,7 +117,7 @@ function renderStale(repos) {
 function renderCommitFeed(commits) {
   const container = document.getElementById('commit-feed');
   if (commits.length === 0) {
-    container.innerHTML = '<p style="color:var(--text-muted);">No recent commits</p>';
+    container.innerHTML = '<p style="color:var(--charcoal);">No recent commits</p>';
     return;
   }
   container.innerHTML = commits.slice(0, 50).map(c => `

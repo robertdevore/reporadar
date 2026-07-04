@@ -5,19 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Settings — RepoRadar</title>
 <link rel="stylesheet" href="/style.css">
-<style>
-.settings-container { max-width: 600px; margin: 0 auto; }
-.setting-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
-.setting-card h3 { margin-bottom: 16px; font-size: 14px; color: var(--text-secondary); }
-.setting-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border-color); }
-.setting-label { font-size: 14px; }
-.setting-desc { font-size: 12px; color: var(--text-muted); }
-.setting-input { width: 100px; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 14px; text-align: right; }
-.export-section { margin-top: 24px; }
-</style>
+
 </head>
 <body>
-<div id="app" style="max-width:1000px;margin:0 auto;padding:0 24px 48px;">
+<div id="app">
   <header class="header">
     <div class="header-left">
       <h1 class="logo"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M19.07 4.93A10 10 0 0 0 6.99 3.34"/><path d="M4 6h.01"/><path d="M2.29 9.62A10 10 0 1 0 21.31 8.35"/><path d="M16.24 7.76A6 6 0 1 0 8.23 16.67"/><path d="M12 18h.01"/><path d="M17.99 11.66A6 6 0 0 1 15.77 16.67"/><circle cx="12" cy="12" r="2"/><path d="m13.41 10.59 5.66-5.66"/></svg> RepoRadar</h1>
@@ -61,7 +52,7 @@
           <div class="setting-desc">Comma-separated folder names to skip during discovery</div>
         </div>
         <div style="flex:1;margin-left:12px;">
-          <input type="text" id="ignored-folders" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-primary);color:var(--text-primary);">
+          <input type="text" id="ignored-folders" style="width:100%;padding:8px;border-radius:var(--rounded-md);border:1px solid var(--hairline);background:var(--surface-card);color:var(--ink);">
         </div>
       </div>
     </div>

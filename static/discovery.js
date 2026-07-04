@@ -50,10 +50,10 @@ async function startDiscovery() {
       renderResultList(newRepos);
     } else if (data.total_found > 0) {
       document.getElementById('result-list').innerHTML =
-        '<p style="color:var(--text-muted);padding:12px;">All ' + data.total_found + ' found repos are already tracked.</p>';
+        '<p style="color:var(--charcoal);padding:12px;">All ' + data.total_found + ' found repos are already tracked.</p>';
     } else {
       document.getElementById('result-list').innerHTML =
-        '<p style="color:var(--text-muted);padding:12px;">No Git repositories found in this directory.</p>';
+        '<p style="color:var(--charcoal);padding:12px;">No Git repositories found in this directory.</p>';
     }
   } catch (err) {
     document.getElementById('discover-loading').classList.add('hidden');
@@ -116,7 +116,7 @@ async function addSelected() {
     document.getElementById('btn-add-selected').style.display = 'none';
     document.getElementById('select-all-row').style.display = 'none';
     document.getElementById('result-list').innerHTML =
-      '<p style="color:var(--accent-green);padding:12px;">✓ Added ' + result.added + ' repositories</p>';
+      '<p style="color:var(--success);padding:12px;">✓ Added ' + result.added + ' repositories</p>';
     lastDiscoveryData = null;
   } catch (err) {
     showToast('Failed to add repos: ' + err.message, 'error');
