@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] — v0.1.0
+## [0.2.0] — 2026-07-15
 
 ### FEATURE
 - Repo registry: add, edit, remove tracked Git repositories

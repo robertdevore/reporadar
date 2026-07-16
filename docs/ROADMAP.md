@@ -1,6 +1,6 @@
 # Roadmap
 
-## v0.1.0 (Current)
+## v0.2.0 (Current checkpoint)
 - [x] Repo registry (add, edit, remove)
 - [x] Git scanner (status, branch, commit, remote)
 - [x] Dashboard with sort, filter, search
@@ -12,7 +12,7 @@
 - [x] JSON export/import
 - [x] Database backup/restore
 
-## v0.2.0 (Planned)
+## v0.3.0 (Planned)
 - [ ] Write action endpoints (stage, commit, push, pull)
 - [ ] Confirmation modal for write actions
 - [ ] Audit log for write actions
