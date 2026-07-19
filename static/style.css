@@ -1150,6 +1150,33 @@ a:hover {
   margin-top: var(--spacing-lg);
 }
 
+.remote-detail-block {
+  margin-top: var(--spacing-lg);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--hairline);
+  background: var(--surface-bone);
+}
+
+.remote-detail-label,
+.remote-detail-value {
+  display: block;
+}
+
+.remote-detail-label {
+  color: var(--charcoal);
+  font: var(--caption);
+  font-weight: 600;
+  margin-bottom: var(--spacing-xs);
+}
+
+.remote-detail-value {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .status-count-box {
   padding: var(--spacing-sm);
   border-right: 1px solid var(--hairline);

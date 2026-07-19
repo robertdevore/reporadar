@@ -86,11 +86,11 @@ function renderDetail(data) {
       <div class="card card-full">
         <div class="commit-card-header">
           <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="3"/><line x1="3" x2="9" y1="12" y2="12"/><line x1="15" x2="21" y1="12" y2="12"/></svg> Recent Commits (${commits.length})</h3>
-          <button type="button" id="commit-toggle" class="commit-toggle" aria-expanded="false" aria-controls="commit-list" onclick="toggleCommitList()" title="Show recent commits">
+          <button type="button" id="commit-toggle" class="commit-toggle open" aria-expanded="true" aria-controls="commit-list" onclick="toggleCommitList()" title="Hide recent commits">
             <svg class="commit-toggle-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
           </button>
         </div>
-        <div id="commit-list" class="commit-list hidden">
+        <div id="commit-list" class="commit-list">
           ${commits.slice(0, 20).map((c, index) => `
             <div class="commit-item">
               ${renderCommitHash(repo.remote_url, c, index)}
@@ -139,12 +139,15 @@ function renderDetail(data) {
         <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> Git Status</h3>
         <div class="info-row"><span class="info-label">Status</span><span class="info-value">${statusBadge}</span></div>
         <div class="info-row"><span class="info-label">Branch</span><span class="info-value">${escHtml(repo.branch || (repo.is_detached === 1 ? '(detached)' : '-'))}</span></div>
-        <div class="info-row"><span class="info-label">Remote</span><span class="info-value" style="font-family:monospace;font-size:11px;">${escHtml(repo.remote_url || 'None')}</span></div>
         <div class="info-row"><span class="info-label">Upstream</span><span class="info-value">${escHtml(repo.upstream_branch || '-')}</span></div>
         <div class="info-row"><span class="info-label">Ahead/Behind</span><span class="info-value">${aheadBehind || 'Even'}</span></div>
         <div class="info-row"><span class="info-label">Has Remote</span><span class="info-value">${repo.has_remote === 1 ? 'Yes' : 'No'}</span></div>
         <div class="info-row"><span class="info-label">Detached HEAD</span><span class="info-value">${repo.is_detached === 1 ? 'Yes' : 'No'}</span></div>
         <div class="info-row"><span class="info-label">Dependabot Alerts</span><span class="info-value">${renderDependabotAlerts(repo.dependabot_alert_count)}</span></div>
+        <div class="remote-detail-block">
+          <span class="remote-detail-label">Remote</span>
+          <span class="remote-detail-value">${escHtml(repo.remote_url || 'None')}</span>
+        </div>
         <div class="status-count-row">
           <div class="status-count-box"><span>Staged</span><strong>${repo.staged_count || 0}</strong></div>
           <div class="status-count-box"><span>Unstaged</span><strong>${repo.unstaged_count || 0}</strong></div>
@@ -177,11 +180,7 @@ function renderFiles(files) {
 function renderCommitHash(remoteUrl, commit, index) {
   const hash = commit.commit_hash || commit.hash || '';
   const shortHash = commit.short_hash || hash.slice(0, 7) || '-';
-  const url = hostedCommitUrl(remoteUrl, hash);
-  if (!url) {
-    return '<button type="button" class="commit-hash commit-hash-button" onclick="showCommitDetails(' + index + ')" title="Show commit details">' + escHtml(shortHash) + '</button>';
-  }
-  return '<a href="' + escAttr(url) + '" target="_blank" rel="noopener" class="commit-hash" title="Open commit">' + escHtml(shortHash) + '</a>';
+  return '<button type="button" class="commit-hash commit-hash-button" onclick="showCommitDetails(' + index + ')" title="Show commit details">' + escHtml(shortHash) + '</button>';
 }
 
 function showCommitDetails(index) {
@@ -207,11 +206,13 @@ function showCommitDetails(index) {
 
   const hash = commit.commit_hash || commit.hash || '';
   const shortHash = commit.short_hash || hash.slice(0, 7) || '-';
+  const externalUrl = hostedCommitUrl(currentRepo && currentRepo.remote_url, hash);
   document.getElementById('commit-details-body').innerHTML = `
     <div class="info-row"><span class="info-label">Hash</span><span class="info-value commit-detail-hash">${escHtml(hash || shortHash)}</span></div>
     <div class="info-row"><span class="info-label">Message</span><span class="info-value">${escHtml(commit.message || '-')}</span></div>
     <div class="info-row"><span class="info-label">Author</span><span class="info-value">${escHtml(commit.author || '-')}</span></div>
     <div class="info-row"><span class="info-label">Date</span><span class="info-value">${commit.date ? formatDate(commit.date) : '-'}</span></div>
+    ${externalUrl ? '<div class="modal-actions"><a class="btn btn-secondary" href="' + escAttr(externalUrl) + '" target="_blank" rel="noopener">Open External Source</a></div>' : ''}
   `;
   modal.classList.remove('hidden');
 }
