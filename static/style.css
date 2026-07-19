@@ -93,11 +93,11 @@
 
   /* === Radii === */
   --rounded-none: 0px;
-  --rounded-xs: 4px;
-  --rounded-sm: 6px;
-  --rounded-md: 10px;
-  --rounded-lg: 16px;
-  --rounded-full: 9999px;
+  --rounded-xs: 0px;
+  --rounded-sm: 0px;
+  --rounded-md: 0px;
+  --rounded-lg: 0px;
+  --rounded-full: 0px;
 
   /* === Layout === */
   --content-width: 100%;
@@ -111,6 +111,7 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  border-radius: 0;
 }
 
 body {
@@ -204,7 +205,7 @@ a:hover {
 }
 
 /* --------------------------------------------------------------------------
-   Buttons — Replicate: fully rounded, orange primary, dark secondary
+   Buttons — Replicate: square, orange primary, dark secondary
    -------------------------------------------------------------------------- */
 .btn {
   font: var(--button-md);
@@ -1093,7 +1094,7 @@ a:hover {
 .chart-bar-item {
   flex: 1;
   background: var(--primary);
-  border-radius: 3px 3px 0 0;
+  border-radius: 0;
   min-height: 2px;
   position: relative;
 }
