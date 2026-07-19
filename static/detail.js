@@ -3,6 +3,7 @@
 const urlParams = new URLSearchParams(window.location.search);
 const repoId = urlParams.get('id');
 let currentRepo = null;
+let currentCommits = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   if (!repoId) {
@@ -40,6 +41,7 @@ function renderDetail(data) {
   currentRepo = repo;
   const fileChanges = data.file_changes || [];
   const commits = data.recent_commits || [];
+  currentCommits = commits;
   const scanHistory = data.scan_history || [];
 
   let statusBadge = '<span class="badge badge-clean">Clean</span>';
@@ -52,11 +54,6 @@ function renderDetail(data) {
   const pinned = repo.pinned === 1 ? ' <span class="badge badge-pinned">★ Pinned</span>' : '';
   const ahead = repo.ahead_count || 0;
   const behind = repo.behind_count || 0;
-  const latestCommitUrl = hostedCommitUrl(repo.remote_url, repo.latest_commit_hash);
-  const latestCommitHash = repo.latest_commit_short_hash || '-';
-  const latestCommitHashHtml = latestCommitUrl
-    ? '<a href="' + escAttr(latestCommitUrl) + '" target="_blank" rel="noopener" class="commit-hash">' + escHtml(latestCommitHash) + '</a>'
-    : '<span class="commit-hash">' + escHtml(latestCommitHash) + '</span>';
 
   let aheadBehind = '';
   if (repo.is_diverged === 1) {
@@ -89,9 +86,9 @@ function renderDetail(data) {
       <div class="card">
         <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="3"/><line x1="3" x2="9" y1="12" y2="12"/><line x1="15" x2="21" y1="12" y2="12"/></svg> Recent Commits (${commits.length})</h3>
         <div class="commit-list">
-          ${commits.slice(0, 20).map(c => `
+          ${commits.slice(0, 20).map((c, index) => `
             <div class="commit-item">
-              ${renderCommitHash(repo.remote_url, c)}
+              ${renderCommitHash(repo.remote_url, c, index)}
               <span class="commit-msg">${escHtml(c.message)}</span>
               <span class="commit-meta">— ${escHtml(c.author)}, ${formatDate(c.date)}</span>
             </div>
@@ -130,10 +127,6 @@ function renderDetail(data) {
           <button class="btn btn-primary" onclick="rescanRepo()"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg> Rescan</button>
           <button class="btn btn-secondary" onclick="copyPath('${escHtml(repo.path).replace(/'/g, "\\'")}')"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy Path</button>
           <button class="btn btn-secondary" onclick="copyStatusSummary()"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="m12 15 2 2 4-4"/><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy Status</button>
-        </div>
-        <div class="latest-commit-inline">
-          <h4>Latest Commit</h4>
-          <p>${latestCommitHashHtml} ${escHtml(repo.latest_commit_message || '-')}</p>
         </div>
       </div>
 
@@ -174,14 +167,51 @@ function renderFiles(files) {
   }).join('');
 }
 
-function renderCommitHash(remoteUrl, commit) {
+function renderCommitHash(remoteUrl, commit, index) {
   const hash = commit.commit_hash || commit.hash || '';
   const shortHash = commit.short_hash || hash.slice(0, 7) || '-';
   const url = hostedCommitUrl(remoteUrl, hash);
   if (!url) {
-    return '<span class="commit-hash">' + escHtml(shortHash) + '</span>';
+    return '<button type="button" class="commit-hash commit-hash-button" onclick="showCommitDetails(' + index + ')" title="Show commit details">' + escHtml(shortHash) + '</button>';
   }
-  return '<a href="' + escAttr(url) + '" target="_blank" rel="noopener" class="commit-hash">' + escHtml(shortHash) + '</a>';
+  return '<a href="' + escAttr(url) + '" target="_blank" rel="noopener" class="commit-hash" title="Open commit">' + escHtml(shortHash) + '</a>';
+}
+
+function showCommitDetails(index) {
+  const commit = currentCommits[index];
+  if (!commit) return;
+
+  let modal = document.getElementById('modal-commit-details');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-commit-details';
+    modal.className = 'modal hidden';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Commit Details</h3>
+          <button class="modal-close" onclick="closeCommitDetails()">✕</button>
+        </div>
+        <div class="modal-body" id="commit-details-body"></div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  const hash = commit.commit_hash || commit.hash || '';
+  const shortHash = commit.short_hash || hash.slice(0, 7) || '-';
+  document.getElementById('commit-details-body').innerHTML = `
+    <div class="info-row"><span class="info-label">Hash</span><span class="info-value commit-detail-hash">${escHtml(hash || shortHash)}</span></div>
+    <div class="info-row"><span class="info-label">Message</span><span class="info-value">${escHtml(commit.message || '-')}</span></div>
+    <div class="info-row"><span class="info-label">Author</span><span class="info-value">${escHtml(commit.author || '-')}</span></div>
+    <div class="info-row"><span class="info-label">Date</span><span class="info-value">${commit.date ? formatDate(commit.date) : '-'}</span></div>
+  `;
+  modal.classList.remove('hidden');
+}
+
+function closeCommitDetails() {
+  const modal = document.getElementById('modal-commit-details');
+  if (modal) modal.classList.add('hidden');
 }
 
 function renderDependabotAlerts(count) {
@@ -316,3 +346,15 @@ function showError(msg) {
   document.getElementById('error-state').classList.remove('hidden');
   document.getElementById('error-msg').textContent = msg;
 }
+
+document.addEventListener('click', (event) => {
+  if (event.target.id === 'modal-commit-details') {
+    closeCommitDetails();
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    closeCommitDetails();
+  }
+});

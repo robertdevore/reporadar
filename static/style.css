@@ -1180,21 +1180,23 @@ a:hover {
   font-weight: 500;
 }
 
-.latest-commit-inline {
-  margin-top: var(--spacing-xl);
-  padding-top: var(--spacing-lg);
-  border-top: 1px solid var(--hairline);
+.commit-hash-button {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
 }
 
-.latest-commit-inline h4 {
-  font: var(--caption-tight);
-  color: var(--charcoal);
-  margin-bottom: var(--spacing-sm);
+.commit-hash:hover,
+.commit-hash-button:hover {
+  color: var(--primary);
+  text-decoration: underline;
 }
 
-.latest-commit-inline p {
-  font: var(--body-sm);
-  color: var(--body-copy);
+.commit-detail-hash {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  word-break: break-all;
 }
 
 /* --------------------------------------------------------------------------
