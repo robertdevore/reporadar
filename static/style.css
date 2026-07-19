@@ -1143,6 +1143,40 @@ a:hover {
   text-overflow: ellipsis;
 }
 
+.status-count-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--hairline);
+  margin-top: var(--spacing-lg);
+}
+
+.status-count-box {
+  padding: var(--spacing-sm);
+  border-right: 1px solid var(--hairline);
+}
+
+.status-count-box:last-child {
+  border-right: 0;
+}
+
+.status-count-box span,
+.status-count-box strong {
+  display: block;
+}
+
+.status-count-box span {
+  color: var(--charcoal);
+  font: var(--caption);
+  font-weight: 600;
+  margin-bottom: var(--spacing-xs);
+}
+
+.status-count-box strong {
+  color: var(--ink);
+  font: var(--heading-sm);
+  font-size: 18px;
+}
+
 .file-list {
   font-family: var(--font-mono);
   font-size: 13px;
@@ -1400,6 +1434,18 @@ body::after {
   .detail-layout,
   .activity-layout {
     grid-template-columns: 1fr;
+  }
+
+  .status-count-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .status-count-box:nth-child(2) {
+    border-right: 0;
+  }
+
+  .status-count-box:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--hairline);
   }
 }
 

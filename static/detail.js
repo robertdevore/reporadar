@@ -139,11 +139,13 @@ function renderDetail(data) {
         <div class="info-row"><span class="info-label">Ahead/Behind</span><span class="info-value">${aheadBehind || 'Even'}</span></div>
         <div class="info-row"><span class="info-label">Has Remote</span><span class="info-value">${repo.has_remote === 1 ? 'Yes' : 'No'}</span></div>
         <div class="info-row"><span class="info-label">Detached HEAD</span><span class="info-value">${repo.is_detached === 1 ? 'Yes' : 'No'}</span></div>
-        <div class="info-row"><span class="info-label">Staged</span><span class="info-value">${repo.staged_count || 0}</span></div>
-        <div class="info-row"><span class="info-label">Unstaged</span><span class="info-value">${repo.unstaged_count || 0}</span></div>
-        <div class="info-row"><span class="info-label">Untracked</span><span class="info-value">${repo.untracked_count || 0}</span></div>
-        <div class="info-row"><span class="info-label">Total Changed</span><span class="info-value">${repo.changed_total || 0}</span></div>
         <div class="info-row"><span class="info-label">Dependabot Alerts</span><span class="info-value">${renderDependabotAlerts(repo.dependabot_alert_count)}</span></div>
+        <div class="status-count-row">
+          <div class="status-count-box"><span>Staged</span><strong>${repo.staged_count || 0}</strong></div>
+          <div class="status-count-box"><span>Unstaged</span><strong>${repo.unstaged_count || 0}</strong></div>
+          <div class="status-count-box"><span>Untracked</span><strong>${repo.untracked_count || 0}</strong></div>
+          <div class="status-count-box"><span>Total Changed</span><strong>${repo.changed_total || 0}</strong></div>
+        </div>
       </div>
 
       ${fileSection}
