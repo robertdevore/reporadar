@@ -131,6 +131,10 @@ function renderDetail(data) {
           <button class="btn btn-secondary" onclick="copyPath('${escHtml(repo.path).replace(/'/g, "\\'")}')"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy Path</button>
           <button class="btn btn-secondary" onclick="copyStatusSummary()"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="m12 15 2 2 4-4"/><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy Status</button>
         </div>
+        <div class="latest-commit-inline">
+          <h4>Latest Commit</h4>
+          <p>${latestCommitHashHtml} ${escHtml(repo.latest_commit_message || '-')}</p>
+        </div>
       </div>
 
       <div class="card">
@@ -147,20 +151,6 @@ function renderDetail(data) {
         <div class="info-row"><span class="info-label">Untracked</span><span class="info-value">${repo.untracked_count || 0}</span></div>
         <div class="info-row"><span class="info-label">Total Changed</span><span class="info-value">${repo.changed_total || 0}</span></div>
         <div class="info-row"><span class="info-label">Dependabot Alerts</span><span class="info-value">${renderDependabotAlerts(repo.dependabot_alert_count)}</span></div>
-      </div>
-
-      <div class="card">
-        <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="m10 9-3 3 3 3"/><path d="m14 15 3-3-3-3"/><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg> Latest Commit</h3>
-        <div class="info-row"><span class="info-label">Hash</span><span class="info-value">${latestCommitHashHtml}</span></div>
-        <div class="info-row"><span class="info-label">Message</span><span class="info-value">${escHtml(repo.latest_commit_message || '-')}</span></div>
-        <div class="info-row"><span class="info-label">Author</span><span class="info-value">${escHtml(repo.latest_commit_author || '-')}</span></div>
-        <div class="info-row"><span class="info-label">Date</span><span class="info-value">${repo.latest_commit_date ? formatDate(repo.latest_commit_date) : '-'}</span></div>
-      </div>
-
-      <div class="card">
-        <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M11 7v4"/><path d="M11 15h.01"/></svg> Scan Info</h3>
-        <div class="info-row"><span class="info-label">Last Scan</span><span class="info-value">${repo.scanned_at ? formatDate(repo.scanned_at) : 'Never'}</span></div>
-        <div class="info-row"><span class="info-label">Error</span><span class="info-value">${repo.scan_error ? escHtml(repo.scan_error) : 'None'}</span></div>
       </div>
 
       ${fileSection}

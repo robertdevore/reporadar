@@ -1180,6 +1180,23 @@ a:hover {
   font-weight: 500;
 }
 
+.latest-commit-inline {
+  margin-top: var(--spacing-xl);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--hairline);
+}
+
+.latest-commit-inline h4 {
+  font: var(--caption-tight);
+  color: var(--charcoal);
+  margin-bottom: var(--spacing-sm);
+}
+
+.latest-commit-inline p {
+  font: var(--body-sm);
+  color: var(--body-copy);
+}
+
 /* --------------------------------------------------------------------------
    Discovery Page
    -------------------------------------------------------------------------- */
