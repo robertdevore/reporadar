@@ -83,9 +83,14 @@ function renderDetail(data) {
   let commitSection = '';
   if (commits.length > 0) {
     commitSection = `
-      <div class="card">
-        <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="3"/><line x1="3" x2="9" y1="12" y2="12"/><line x1="15" x2="21" y1="12" y2="12"/></svg> Recent Commits (${commits.length})</h3>
-        <div class="commit-list">
+      <div class="card card-full">
+        <div class="commit-card-header">
+          <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="3"/><line x1="3" x2="9" y1="12" y2="12"/><line x1="15" x2="21" y1="12" y2="12"/></svg> Recent Commits (${commits.length})</h3>
+          <button type="button" id="commit-toggle" class="commit-toggle" aria-expanded="false" aria-controls="commit-list" onclick="toggleCommitList()" title="Show recent commits">
+            <svg class="commit-toggle-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
+        <div id="commit-list" class="commit-list hidden">
           ${commits.slice(0, 20).map((c, index) => `
             <div class="commit-item">
               ${renderCommitHash(repo.remote_url, c, index)}
@@ -148,9 +153,9 @@ function renderDetail(data) {
         </div>
       </div>
 
-      ${fileSection}
-      ${commitSection}
       ${scanSection}
+      ${commitSection}
+      ${fileSection}
     </div>
   `;
 
@@ -214,6 +219,18 @@ function showCommitDetails(index) {
 function closeCommitDetails() {
   const modal = document.getElementById('modal-commit-details');
   if (modal) modal.classList.add('hidden');
+}
+
+function toggleCommitList() {
+  const list = document.getElementById('commit-list');
+  const toggle = document.getElementById('commit-toggle');
+  if (!list || !toggle) return;
+
+  const shouldOpen = list.classList.contains('hidden');
+  list.classList.toggle('hidden', !shouldOpen);
+  toggle.classList.toggle('open', shouldOpen);
+  toggle.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+  toggle.setAttribute('title', shouldOpen ? 'Hide recent commits' : 'Show recent commits');
 }
 
 function renderDependabotAlerts(count) {
