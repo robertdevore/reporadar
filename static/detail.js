@@ -86,7 +86,7 @@ function renderDetail(data) {
   let commitSection = '';
   if (commits.length > 0) {
     commitSection = `
-      <div class="card card-full">
+      <div class="card">
         <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="3"/><line x1="3" x2="9" y1="12" y2="12"/><line x1="15" x2="21" y1="12" y2="12"/></svg> Recent Commits (${commits.length})</h3>
         <div class="commit-list">
           ${commits.slice(0, 20).map(c => `
@@ -104,7 +104,7 @@ function renderDetail(data) {
   let scanSection = '';
   if (scanHistory.length > 0) {
     scanSection = `
-      <div class="card card-full">
+      <div class="card">
         <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> Scan History</h3>
         ${scanHistory.slice(0, 5).map(s => `
           <div class="info-row">
