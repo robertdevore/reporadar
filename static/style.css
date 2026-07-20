@@ -764,21 +764,6 @@ a:hover {
   background: rgba(234, 40, 4, 0.03);
 }
 
-/* --------------------------------------------------------------------------
-   Status Dots & Badges — Fully Rounded
-   -------------------------------------------------------------------------- */
-.status-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: var(--rounded-full);
-}
-
-.status-dot.clean { background: var(--badge-success); }
-.status-dot.dirty { background: var(--warning); }
-.status-dot.error { background: var(--primary); }
-.status-dot.unknown { background: var(--stone); }
-
 .badge {
   display: inline-block;
   padding: 3px 10px;
@@ -1856,16 +1841,50 @@ body::after {
   }
 
   .controls {
-    flex-direction: column;
+    align-items: stretch;
+    padding: var(--spacing-md);
+    gap: var(--spacing-md);
   }
 
   .controls-left {
-    flex-direction: column;
     width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--spacing-sm);
   }
 
-  .search-input {
+  .search-input,
+  #filter-status {
+    grid-column: 1 / -1;
     min-width: 100%;
+  }
+
+  .filter-select,
+  .controls-left .btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .controls-left .btn {
+    justify-content: center;
+    padding-left: var(--spacing-md);
+    padding-right: var(--spacing-md);
+  }
+
+  .controls-right {
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+    padding-top: var(--spacing-xs);
+    border-top: 1px solid var(--hairline);
+  }
+
+  .view-chip {
+    max-width: 100%;
+    order: 3;
+    flex-basis: 100%;
   }
 
   .table-container {

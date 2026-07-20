@@ -676,7 +676,7 @@ function renderTable(syncUrl = true) {
   if (repos.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="14" style="text-align:center;padding:32px;color:var(--charcoal);">
+        <td colspan="13" style="text-align:center;padding:32px;color:var(--charcoal);">
           No repositories match the current filters.
         </td>
       </tr>
@@ -737,16 +737,13 @@ function getSortValue(repo, col) {
 
 function renderRow(repo) {
   let rowClass = 'row-clean';
-  let statusDot = 'clean';
   let stateBadge = '<span class="badge badge-clean">Clean</span>';
 
   if (repo.scan_error && repo.scan_error !== '') {
     rowClass = 'row-error';
-    statusDot = 'error';
     stateBadge = '<span class="badge badge-error">Error</span>';
   } else if (repo.is_clean === 0) {
     rowClass = 'row-dirty';
-    statusDot = 'dirty';
     stateBadge = '<span class="badge badge-dirty">Dirty</span>';
   }
 
@@ -777,7 +774,6 @@ function renderRow(repo) {
 
   return `
     <tr class="${rowClass}">
-      <td><span class="status-dot ${statusDot}" title="${statusDot}"></span></td>
       <td>
         <a href="/detail.html?id=${repoId}" class="repo-link">${escHtml(name)}</a>
         ${repo.pinned === 1 ? '<span class="badge badge-pinned">★</span>' : ''}

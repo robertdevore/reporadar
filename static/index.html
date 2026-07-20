@@ -98,7 +98,7 @@
   <!-- Controls -->
   <div class="controls">
     <div class="controls-left">
-      <input type="text" id="search-input" class="search-input" placeholder="Search repos... (name, path, group, tag, branch, commit message)">
+      <input type="text" id="search-input" class="search-input" placeholder="Search repos by name, path, branch, group, or tag">
       <select id="filter-status" class="filter-select">
         <option value="all">All Repos</option>
         <option value="clean">Clean</option>
@@ -136,7 +136,6 @@
     <table id="repo-table" class="repo-table">
       <thead>
         <tr>
-          <th class="sortable" data-sort="status">Status</th>
           <th class="sortable" data-sort="name">Repo Name</th>
           <th class="sortable" data-sort="group_name">Group</th>
           <th class="sortable" data-sort="tags">Tags</th>
