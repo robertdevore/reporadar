@@ -15,7 +15,7 @@
       <span class="version">v0.2.0</span>
     </div>
     <div class="header-right">
-      <a href="/" class="btn btn-ghost">← Dashboard</a>
+      <a href="/" class="btn btn-ghost"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg> Dashboard</a>
     </div>
   </header>
   <script>
@@ -35,76 +35,80 @@
   <div id="loading-state" class="loading-state"><div class="spinner"></div><p>Loading settings...</p></div>
 
   <div id="settings-content" class="hidden settings-container">
-    <div class="setting-card">
-      <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg> General Settings</h3>
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Stale Threshold (days)</div>
-          <div class="setting-desc">Repos without commits beyond this are marked stale</div>
+    <div class="settings-panel">
+      <section class="setting-section">
+        <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg> General Settings</h3>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Stale Threshold (days)</div>
+            <div class="setting-desc">Repos without commits beyond this are marked stale</div>
+          </div>
+          <input type="number" id="stale-threshold" class="setting-input" min="1" max="365">
         </div>
-        <input type="number" id="stale-threshold" class="setting-input" min="1" max="365">
-      </div>
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Default Activity Window (days)</div>
-          <div class="setting-desc">Default time window for the Activity view</div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Default Activity Window (days)</div>
+            <div class="setting-desc">Default time window for the Activity view</div>
+          </div>
+          <input type="number" id="activity-window" class="setting-input" min="1" max="365">
         </div>
-        <input type="number" id="activity-window" class="setting-input" min="1" max="365">
-      </div>
-      <div style="margin-top:16px;">
-        <button class="btn btn-primary" id="btn-save-settings"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg> Save Settings</button>
-      </div>
+        <div class="settings-actions">
+          <button class="btn btn-primary" id="btn-save-settings"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg> Save Settings</button>
+        </div>
+      </section>
+
+      <section class="setting-section export-section">
+        <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> Data Management</h3>
+        <div class="settings-actions">
+          <button class="btn btn-secondary" id="btn-export-json"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg> Export Registry</button>
+          <button class="btn btn-secondary" id="btn-export-db"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 12a9 3 0 0 0 5 2.69"/><path d="M21 9.3V5"/><path d="M3 5v14a9 3 0 0 0 6.47 2.88"/><path d="M12 12v4h4"/><path d="M13 20a5 5 0 0 0 9-3 4.5 4.5 0 0 0-4.5-4.5c-1.33 0-2.54.54-3.41 1.41L12 16"/></svg> Backup Database</button>
+          <button class="btn btn-secondary" id="btn-import-trigger" onclick="document.getElementById('import-file').click()"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg> Import Registry</button>
+          <input type="file" id="import-file" accept=".json" style="display:none;" onchange="handleImport(event)">
+        </div>
+      </section>
     </div>
 
-    <div class="setting-card">
-      <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg> Discovery Settings</h3>
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Ignored Folders</div>
-          <div class="setting-desc">Comma-separated folder names to skip during discovery</div>
+    <div class="settings-panel">
+      <section class="setting-section">
+        <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg> Discovery Settings</h3>
+        <div class="setting-row setting-row-stack">
+          <div>
+            <div class="setting-label">Ignored Folders</div>
+            <div class="setting-desc">Comma-separated folder names to skip during discovery</div>
+          </div>
+          <input type="text" id="ignored-folders" class="setting-text-input">
         </div>
-        <div style="flex:1;margin-left:12px;">
-          <input type="text" id="ignored-folders" style="width:100%;padding:8px;border-radius:0;border:1px solid var(--hairline);background:var(--surface-card);color:var(--ink);">
-        </div>
-      </div>
-    </div>
+      </section>
 
-    <div class="setting-card">
-      <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="M9 12l2 2 4-4"/></svg> Security Enrichment</h3>
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Enable Dependabot Alerts</div>
-          <div class="setting-desc">Use the GitHub CLI to fetch open Dependabot alert counts for GitHub remotes</div>
+      <section class="setting-section">
+        <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="M9 12l2 2 4-4"/></svg> Security Enrichment</h3>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Enable Dependabot Alerts</div>
+            <div class="setting-desc">Use the GitHub CLI to fetch open Dependabot alert counts for GitHub remotes</div>
+          </div>
+          <label class="setting-switch">
+            <input type="checkbox" id="enable-dependabot">
+            <span class="setting-switch-control" aria-hidden="true"></span>
+            <span>Enabled</span>
+          </label>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-          <input type="checkbox" id="enable-dependabot">
-          <span>Enabled</span>
-        </label>
-      </div>
-    </div>
+      </section>
 
-    <div class="setting-card">
-      <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Write Actions</h3>
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Enable Write Actions</div>
-          <div class="setting-desc">Allow staging, committing, pushing, and pulling (use with caution)</div>
+      <section class="setting-section">
+        <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Write Actions</h3>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Enable Write Actions</div>
+            <div class="setting-desc">Allow staging, committing, pushing, and pulling (use with caution)</div>
+          </div>
+          <label class="setting-switch">
+            <input type="checkbox" id="enable-write">
+            <span class="setting-switch-control" aria-hidden="true"></span>
+            <span>Enabled</span>
+          </label>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-          <input type="checkbox" id="enable-write">
-          <span>Enabled</span>
-        </label>
-      </div>
-    </div>
-
-    <div class="setting-card export-section">
-      <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> Data Management</h3>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-secondary" id="btn-export-json"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg> Export Registry</button>
-        <button class="btn btn-secondary" id="btn-export-db"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 12a9 3 0 0 0 5 2.69"/><path d="M21 9.3V5"/><path d="M3 5v14a9 3 0 0 0 6.47 2.88"/><path d="M12 12v4h4"/><path d="M13 20a5 5 0 0 0 9-3 4.5 4.5 0 0 0-4.5-4.5c-1.33 0-2.54.54-3.41 1.41L12 16"/></svg> Backup Database</button>
-        <button class="btn btn-secondary" id="btn-import-trigger" onclick="document.getElementById('import-file').click()"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg> Import Registry</button>
-        <input type="file" id="import-file" accept=".json" style="display:none;" onchange="handleImport(event)">
-      </div>
+      </section>
     </div>
   </div>
 </div>

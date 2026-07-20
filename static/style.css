@@ -1898,8 +1898,45 @@ a:hover {
    Settings Page
    -------------------------------------------------------------------------- */
 .settings-container {
-  max-width: 680px;
-  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-xl);
+  margin: var(--spacing-xl) auto 0;
+  max-width: 100%;
+}
+
+.settings-panel {
+  background: var(--surface-card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-md);
+  min-width: 0;
+}
+
+.setting-section {
+  padding: var(--spacing-xl);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.setting-section:last-child {
+  border-bottom: 0;
+}
+
+.settings-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  margin-top: var(--spacing-lg);
+}
+
+.settings-container .btn {
+  font-family: var(--font-display);
+  letter-spacing: 0;
+}
+
+.settings-container h3,
+.settings-container .setting-label {
+  font-family: var(--font-display);
+  letter-spacing: 0;
 }
 
 .setting-card {
@@ -1910,26 +1947,39 @@ a:hover {
   margin-bottom: var(--spacing-xl);
 }
 
-.setting-card h3 {
-  font-family: var(--font-display);
-  font: var(--heading-sm);
-  font-size: 18px;
+.setting-card h3,
+.setting-section h3 {
+  font: 600 18px/1.4 var(--font-display);
   font-weight: 600;
-  letter-spacing: var(--tracking-heading-sm);
+  letter-spacing: 0;
   margin-bottom: var(--spacing-xl);
   color: var(--ink);
+}
+
+.setting-section h3 svg {
+  color: var(--accent);
 }
 
 .setting-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: var(--spacing-lg);
   padding: var(--spacing-md) 0;
   border-bottom: 1px solid var(--hairline);
 }
 
+.setting-row:last-child {
+  border-bottom: 0;
+}
+
+.setting-row-stack {
+  align-items: stretch;
+  flex-direction: column;
+}
+
 .setting-label {
-  font: var(--body-md);
+  font-family: var(--font-display);
   font-size: 14px;
   font-weight: 600;
 }
@@ -1941,22 +1991,107 @@ a:hover {
   margin-top: 2px;
 }
 
-.setting-input {
-  width: 100px;
-  padding: 8px 14px;
+.setting-input,
+.setting-text-input {
   border-radius: var(--rounded-full);
   border: 1px solid var(--hairline);
   background: var(--surface-card);
   color: var(--ink);
-  font: var(--body-md);
+  font-family: var(--font-display);
   font-size: 14px;
+  letter-spacing: 0;
+}
+
+.setting-input {
+  width: 112px;
+  padding: 9px 14px;
   text-align: right;
 }
 
-.setting-input:focus {
+.setting-text-input {
+  width: 100%;
+  padding: 10px 14px;
+}
+
+.setting-input:focus,
+.setting-text-input:focus {
   outline: none;
   border-color: var(--ink);
   box-shadow: 0 0 0 3px var(--ring-focus);
+}
+
+.setting-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+  color: var(--charcoal);
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.setting-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.setting-switch-control {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex: 0 0 38px;
+  border: 1px solid var(--hairline);
+  background: var(--surface-bone);
+}
+
+.setting-switch-control::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 14px;
+  height: 14px;
+  background: var(--ash);
+  transition: transform 0.15s, background 0.15s;
+}
+
+.setting-switch input:checked + .setting-switch-control {
+  border-color: var(--accent);
+  background:
+    radial-gradient(rgba(252, 252, 252, 0.44) 1px, transparent 1.2px),
+    var(--accent);
+  background-size: 5px 5px, 100% 100%;
+}
+
+.setting-switch input:checked + .setting-switch-control::after {
+  background: var(--on-primary);
+  transform: translateX(16px);
+}
+
+.setting-switch input:focus-visible + .setting-switch-control {
+  outline: 3px solid var(--ring-focus);
+  outline-offset: 2px;
+}
+
+/* Legacy setting-card styles stay available for older static fragments. */
+.setting-card {
+  background: var(--surface-card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-md);
+  padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
+}
+
+.setting-card h3 {
+  font: 600 18px/1.4 var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0;
+  margin-bottom: var(--spacing-xl);
+  color: var(--ink);
 }
 
 /* --------------------------------------------------------------------------
@@ -2038,6 +2173,10 @@ body::after {
 @media (max-width: 1024px) {
   #app {
     padding: 0 var(--spacing-lg);
+  }
+
+  .settings-container {
+    grid-template-columns: 1fr;
   }
 
   .dashboard-summary .summary-hero {
