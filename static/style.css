@@ -1129,12 +1129,44 @@ a:hover {
    Action Cell (Table Buttons)
    -------------------------------------------------------------------------- */
 .action-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
   white-space: nowrap;
 }
 
-.action-cell .btn {
-  font-size: 12px;
-  padding: 5px 12px;
+.action-icon-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--mute);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.action-icon-btn:hover {
+  color: var(--primary);
+  background: var(--surface-bone);
+}
+
+.action-icon-btn:focus-visible {
+  outline: 2px solid var(--ring-focus);
+  outline-offset: 2px;
+}
+
+.action-icon-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.action-icon-btn-danger:hover {
+  color: var(--error);
 }
 
 /* --------------------------------------------------------------------------
