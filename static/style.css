@@ -289,8 +289,17 @@ a:hover {
    Header Buttons
    -------------------------------------------------------------------------- */
 .header-right .btn {
+  font-family: var(--font-display);
   font-size: 14px;
+  letter-spacing: 0;
   padding: 10px 20px;
+}
+
+#btn-copy-view,
+#btn-reset-view,
+#btn-columns {
+  font-family: var(--font-display);
+  letter-spacing: 0;
 }
 
 .header-right .btn-primary {
@@ -737,6 +746,49 @@ a:hover {
   align-items: center;
 }
 
+.column-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.column-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  width: 220px;
+  padding: var(--spacing-sm);
+  background: var(--surface-card);
+  border: 1px solid var(--hairline-strong);
+  box-shadow: 0 14px 34px rgba(32, 32, 32, 0.14);
+}
+
+.column-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: 34px;
+  padding: 6px 8px;
+  color: var(--body-copy);
+  font: var(--caption-tight);
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.column-menu-item:hover {
+  background: var(--surface-bone);
+}
+
+.column-menu-item input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--primary);
+}
+
+.column-menu-item input:disabled {
+  cursor: not-allowed;
+}
+
 .controls-right {
   display: flex;
   gap: var(--spacing-md);
@@ -851,6 +903,10 @@ a:hover {
 
 .repo-table th.sorted {
   color: var(--primary);
+}
+
+.repo-table .column-hidden {
+  display: none;
 }
 
 .repo-table td {
@@ -1979,7 +2035,8 @@ body::after {
   }
 
   .filter-select,
-  .controls-left .btn {
+  .controls-left .btn,
+  .column-menu-wrap {
     width: 100%;
     min-width: 0;
   }
@@ -1988,6 +2045,12 @@ body::after {
     justify-content: center;
     padding-left: var(--spacing-md);
     padding-right: var(--spacing-md);
+  }
+
+  .column-menu {
+    right: auto;
+    left: 0;
+    width: min(100%, 325px);
   }
 
   .controls-right {

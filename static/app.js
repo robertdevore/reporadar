@@ -6,6 +6,22 @@ const LOADER_ICON = '<svg class="spin-icon" xmlns="http://www.w3.org/2000/svg" w
 const CHECK_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
 const X_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
 const DOT_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="4"/></svg>';
+const COLUMN_STORAGE_KEY = 'reporadar.visibleColumns.v1';
+const TABLE_COLUMNS = [
+  { key: 'name', label: 'Repo Name', locked: true },
+  { key: 'group', label: 'Group' },
+  { key: 'tags', label: 'Tags' },
+  { key: 'branch', label: 'Branch' },
+  { key: 'state', label: 'State' },
+  { key: 'staged', label: 'Staged' },
+  { key: 'unstaged', label: 'Unstaged' },
+  { key: 'untracked', label: 'Untracked' },
+  { key: 'ahead', label: 'Ahead' },
+  { key: 'behind', label: 'Behind' },
+  { key: 'alerts', label: 'Alerts' },
+  { key: 'last_commit', label: 'Last Commit' },
+  { key: 'actions', label: 'Actions' }
+];
 
 let allRepos = [];
 let sortColumn = 'name';
@@ -14,6 +30,7 @@ let currentFilter = 'all';
 let initialViewLoaded = false;
 let scanCloseTimer = null;
 let lastServerSummary = {};
+let visibleColumns = loadVisibleColumns();
 
 // === Init ===
 document.addEventListener('DOMContentLoaded', () => {
@@ -48,6 +65,7 @@ function setupEventListeners() {
   document.getElementById('filter-tag').addEventListener('change', renderTable);
   document.getElementById('btn-copy-view').addEventListener('click', copyCurrentViewLink);
   document.getElementById('btn-reset-view').addEventListener('click', resetView);
+  document.getElementById('btn-columns').addEventListener('click', toggleColumnMenu);
   document.querySelectorAll('[data-summary-filter]').forEach(button => {
     button.addEventListener('click', () => applySummaryFilter(button.dataset.summaryFilter));
   });
@@ -55,6 +73,15 @@ function setupEventListeners() {
     applyViewFromUrl();
     renderTable(false);
   });
+  document.addEventListener('click', event => {
+    if (!event.target.closest('.column-menu-wrap')) closeColumnMenu();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeColumnMenu();
+  });
+
+  renderColumnMenu();
+  applyColumnVisibility();
 
   // Sortable columns
   document.querySelectorAll('.repo-table th.sortable').forEach(th => {
@@ -69,6 +96,81 @@ function setupEventListeners() {
       renderTable();
     });
   });
+}
+
+function loadVisibleColumns() {
+  try {
+    const raw = localStorage.getItem(COLUMN_STORAGE_KEY);
+    if (!raw) return TABLE_COLUMNS.map(col => col.key);
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return TABLE_COLUMNS.map(col => col.key);
+    const known = new Set(TABLE_COLUMNS.map(col => col.key));
+    const kept = parsed.filter(key => known.has(key));
+    if (!kept.includes('name')) kept.unshift('name');
+    return kept.length > 0 ? kept : TABLE_COLUMNS.map(col => col.key);
+  } catch (err) {
+    return TABLE_COLUMNS.map(col => col.key);
+  }
+}
+
+function saveVisibleColumns() {
+  try {
+    localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(visibleColumns));
+  } catch (err) {}
+}
+
+function renderColumnMenu() {
+  const menu = document.getElementById('column-menu');
+  if (!menu) return;
+  const visible = new Set(visibleColumns);
+  menu.innerHTML = TABLE_COLUMNS.map(col => {
+    const checked = visible.has(col.key) ? ' checked' : '';
+    const disabled = col.locked ? ' disabled' : '';
+    return `
+      <label class="column-menu-item" role="menuitemcheckbox" aria-checked="${visible.has(col.key)}">
+        <input type="checkbox" value="${col.key}"${checked}${disabled}>
+        <span>${col.label}</span>
+      </label>
+    `;
+  }).join('');
+  menu.querySelectorAll('input[type="checkbox"]').forEach(input => {
+    input.addEventListener('change', updateColumnVisibilityFromMenu);
+  });
+}
+
+function updateColumnVisibilityFromMenu() {
+  const selected = ['name'];
+  document.querySelectorAll('#column-menu input[type="checkbox"]').forEach(input => {
+    if (input.checked && input.value !== 'name') selected.push(input.value);
+  });
+  visibleColumns = selected;
+  saveVisibleColumns();
+  renderColumnMenu();
+  applyColumnVisibility();
+}
+
+function applyColumnVisibility() {
+  const visible = new Set(visibleColumns);
+  document.querySelectorAll('[data-column]').forEach(el => {
+    el.classList.toggle('column-hidden', !visible.has(el.dataset.column));
+  });
+}
+
+function toggleColumnMenu(event) {
+  event.stopPropagation();
+  const menu = document.getElementById('column-menu');
+  const button = document.getElementById('btn-columns');
+  const nextOpen = menu.classList.contains('hidden');
+  menu.classList.toggle('hidden', !nextOpen);
+  button.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+}
+
+function closeColumnMenu() {
+  const menu = document.getElementById('column-menu');
+  const button = document.getElementById('btn-columns');
+  if (!menu || menu.classList.contains('hidden')) return;
+  menu.classList.add('hidden');
+  if (button) button.setAttribute('aria-expanded', 'false');
 }
 
 // === API Calls ===
@@ -708,6 +810,7 @@ function renderTable(syncUrl = true) {
   } else {
     tbody.innerHTML = repos.map(r => renderRow(r)).join('');
   }
+  applyColumnVisibility();
 
   // Update counts
   currentFilter = statusFilter;
@@ -798,22 +901,22 @@ function renderRow(repo) {
 
   return `
     <tr class="${rowClass}">
-      <td>
+      <td data-column="name">
         <a href="/detail.html?id=${repoId}" class="repo-link">${escHtml(name)}</a>
         ${repo.pinned === 1 ? '<span class="badge badge-pinned">★</span>' : ''}
       </td>
-      <td>${escHtml(repo.group_name || '-')}</td>
-      <td>${tags || '-'}</td>
-      <td>${escHtml(branch)}</td>
-      <td>${stateBadge}</td>
-      <td>${repo.staged_count || 0}</td>
-      <td>${repo.unstaged_count || 0}</td>
-      <td>${repo.untracked_count || 0}</td>
-      <td>${aheadHtml}</td>
-      <td>${behindHtml}</td>
-      <td>${alertHtml}</td>
-      <td title="${escAttr(repo.latest_commit_message || '')}">${lastCommitHtml}</td>
-      <td class="action-cell">
+      <td data-column="group">${escHtml(repo.group_name || '-')}</td>
+      <td data-column="tags">${tags || '-'}</td>
+      <td data-column="branch">${escHtml(branch)}</td>
+      <td data-column="state">${stateBadge}</td>
+      <td data-column="staged">${repo.staged_count || 0}</td>
+      <td data-column="unstaged">${repo.unstaged_count || 0}</td>
+      <td data-column="untracked">${repo.untracked_count || 0}</td>
+      <td data-column="ahead">${aheadHtml}</td>
+      <td data-column="behind">${behindHtml}</td>
+      <td data-column="alerts">${alertHtml}</td>
+      <td data-column="last_commit" title="${escAttr(repo.latest_commit_message || '')}">${lastCommitHtml}</td>
+      <td data-column="actions" class="action-cell">
         <button class="action-icon-btn" onclick="scanRepo(${repoId})" title="Scan" aria-label="Scan"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
         <button class="action-icon-btn" onclick="openEditModalById(${repoId})" title="Edit" aria-label="Edit"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 21h8"/><path d="m15 5 4 4"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg></button>
         <button class="action-icon-btn action-icon-btn-danger" onclick="removeRepoById(${repoId})" title="Remove" aria-label="Remove"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
