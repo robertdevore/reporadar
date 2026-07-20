@@ -38,10 +38,12 @@
   --on-dark-mute: rgba(252, 252, 252, 0.72);
 
   /* === Brand & Accent === */
+  --accent: #386494;
+  --accent-deep: #2d5076;
   --primary: #ea2804;
   --primary-deep: #c01f00;
   --on-primary: #ffffff;
-  --link: #ea2804;
+  --link: var(--accent);
 
   /* === Semantic === */
   --badge-success: #2b9a66;
@@ -155,7 +157,7 @@ a, a:visited {
 }
 
 a:hover {
-  color: var(--primary-deep);
+  color: var(--accent-deep);
   text-decoration: underline;
 }
 
@@ -195,7 +197,7 @@ a:hover {
 }
 
 .logo svg {
-  color: var(--primary);
+  color: var(--accent);
   width: 24px;
   height: 24px;
 }
@@ -238,14 +240,14 @@ a:hover {
   flex-shrink: 0;
 }
 
-/* Primary — Hot Orange CTA */
+/* Primary — Accent CTA */
 .btn-primary {
-  background: var(--primary);
+  background: var(--accent);
   color: var(--on-primary);
 }
 
 .btn-primary:hover {
-  background: var(--primary-deep);
+  background: var(--accent-deep);
 }
 
 /* Secondary — Outlined */
@@ -303,7 +305,7 @@ a:hover {
 }
 
 .header-right .btn-primary {
-  background: var(--primary);
+  background: var(--accent);
   color: var(--on-primary);
 }
 
@@ -319,7 +321,7 @@ a:hover {
 }
 
 .header-right .btn-ghost:hover {
-  color: var(--primary);
+  color: var(--accent);
   background: transparent;
 }
 
@@ -864,10 +866,10 @@ a:hover {
 }
 
 .column-menu-item input:checked + .column-menu-check {
-  border-color: var(--primary);
+  border-color: var(--accent);
   background:
     radial-gradient(rgba(32, 32, 32, 0.34) 1px, transparent 1.2px),
-    var(--primary);
+    var(--accent);
   background-size: 4px 4px, 100% 100%;
 }
 
@@ -975,10 +977,11 @@ a:hover {
   padding: 12px 16px;
   background: var(--surface-card);
   color: var(--charcoal);
-  font: var(--caption-tight);
-  font-size: 11px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 1.2;
   font-weight: 600;
-  letter-spacing: var(--tracking-caption-tight);
+  letter-spacing: 0;
   border-bottom: 1px solid var(--hairline);
   white-space: nowrap;
   cursor: default;
@@ -989,11 +992,11 @@ a:hover {
 }
 
 .repo-table th.sortable:hover {
-  color: var(--primary);
+  color: var(--accent);
 }
 
 .repo-table th.sorted {
-  color: var(--primary);
+  color: var(--accent);
 }
 
 .repo-table .column-hidden {
@@ -1027,7 +1030,7 @@ a:hover {
 }
 
 .repo-table tr.row-pinned td {
-  background: rgba(234, 40, 4, 0.03);
+  background: rgba(56, 100, 148, 0.04);
 }
 
 .badge {
@@ -1070,8 +1073,8 @@ a:hover {
 }
 
 .badge-pinned {
-  background: rgba(234, 40, 4, 0.06);
-  color: var(--primary);
+  background: rgba(56, 100, 148, 0.08);
+  color: var(--accent);
 }
 
 .badge-alert {
@@ -1103,7 +1106,7 @@ a:hover {
 }
 
 .commit-hash-link:hover {
-  color: var(--primary);
+  color: var(--accent);
 }
 
 /* --------------------------------------------------------------------------
@@ -1125,6 +1128,13 @@ a:hover {
 .error-icon {
   font-size: 36px;
   margin-bottom: var(--spacing-lg);
+}
+
+.empty-icon {
+  color: var(--accent);
+}
+
+.error-icon {
   color: var(--primary);
 }
 
@@ -1160,7 +1170,7 @@ a:hover {
   width: 24px;
   height: 24px;
   border: 2px solid var(--hairline);
-  border-top-color: var(--primary);
+  border-top-color: var(--accent);
   border-radius: var(--rounded-full);
   animation: spin 0.6s linear infinite;
   margin: 0 auto var(--spacing-lg);
@@ -1311,7 +1321,7 @@ a:hover {
 
 .progress-bar {
   height: 100%;
-  background: var(--primary);
+  background: var(--accent);
   width: 0%;
   transition: width 0.3s;
 }
@@ -1471,7 +1481,7 @@ a:hover {
 }
 
 .action-icon-btn:hover {
-  color: var(--primary);
+  color: var(--accent);
   background: var(--surface-bone);
 }
 
@@ -1557,7 +1567,7 @@ a:hover {
 
 .repo-count {
   font-weight: 600;
-  color: var(--primary);
+  color: var(--accent);
 }
 
 /* --------------------------------------------------------------------------
@@ -1579,7 +1589,7 @@ a:hover {
   font-family: var(--font-mono);
   font: var(--code-sm);
   font-size: 11px;
-  color: var(--primary);
+  color: var(--accent);
 }
 
 .commit-msg {
@@ -1820,7 +1830,7 @@ a:hover {
 
 .commit-hash:hover,
 .commit-hash-button:hover {
-  color: var(--primary);
+  color: var(--accent);
   text-decoration: underline;
 }
 
@@ -1861,7 +1871,7 @@ a:hover {
 .result-checkbox {
   width: 18px;
   height: 18px;
-  accent-color: var(--primary);
+  accent-color: var(--accent);
   border-radius: var(--rounded-xs);
 }
 
