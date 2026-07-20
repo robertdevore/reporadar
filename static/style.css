@@ -57,6 +57,14 @@
   /* === Overlay === */
   --semantic-overlay: rgba(0, 0, 0, 0.5);
 
+  /* === Scrollbars === */
+  --scrollbar-track: var(--surface-bone);
+  --scrollbar-thumb: var(--surface-dark);
+  --scrollbar-thumb-hover: var(--accent);
+  --scrollbar-dark-track: rgba(252, 252, 252, 0.08);
+  --scrollbar-dark-thumb: rgba(252, 252, 252, 0.32);
+  --scrollbar-dark-thumb-hover: var(--accent);
+
   /* === Typography === */
   --font-display: "Departure Mono", "SFMono-Regular", "Cascadia Code", "Roboto Mono", "Liberation Mono", Menlo, Consolas, monospace;
   --font-body: "Inter", "Geist", -apple-system, "system-ui", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -133,6 +141,42 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+* {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-left: 1px solid var(--hairline);
+}
+
+::-webkit-scrollbar-thumb {
+  background:
+    radial-gradient(rgba(252, 252, 252, 0.28) 1px, transparent 1.2px),
+    var(--scrollbar-thumb);
+  background-size: 4px 4px, 100% 100%;
+  border: 3px solid var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background:
+    radial-gradient(rgba(32, 32, 32, 0.28) 1px, transparent 1.2px),
+    var(--scrollbar-thumb-hover);
+  background-size: 4px 4px, 100% 100%;
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--scrollbar-track);
 }
 
 #app {
@@ -964,6 +1008,17 @@ a:hover {
   border-radius: var(--rounded-lg);
   padding: 0;
   margin-bottom: var(--spacing-xl);
+  scrollbar-color: var(--scrollbar-thumb) var(--surface-card);
+}
+
+.table-container::-webkit-scrollbar-track {
+  background: var(--surface-card);
+  border-top: 1px solid var(--hairline);
+  border-left: 0;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+  border-color: var(--surface-card);
 }
 
 .repo-table {
@@ -1205,6 +1260,16 @@ a:hover {
   max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
+  scrollbar-color: var(--scrollbar-thumb) var(--surface-card);
+}
+
+.modal-content::-webkit-scrollbar-track {
+  background: var(--surface-card);
+  border-left: 1px solid var(--hairline);
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+  border-color: var(--surface-card);
 }
 
 .modal-header {
@@ -1226,6 +1291,54 @@ a:hover {
 #modal-scan .modal-header h3 {
   font: 600 20px/1.4 var(--font-display);
   letter-spacing: 0;
+}
+
+#modal-scan .modal-content {
+  max-width: 620px;
+  overflow: hidden;
+}
+
+#modal-scan .modal-header {
+  background: var(--surface-dark);
+  border-bottom: 1px solid var(--divider-dark);
+  padding: var(--spacing-lg) var(--spacing-xl);
+}
+
+#modal-scan .modal-header h3 {
+  color: var(--on-dark);
+}
+
+#modal-scan .modal-body {
+  padding: var(--spacing-xl);
+  background:
+    linear-gradient(90deg, var(--surface-dark) 0 112px, transparent 112px),
+    var(--surface-card);
+  min-height: 360px;
+}
+
+#modal-scan .progress-bar-container,
+#modal-scan .scan-current-text,
+#modal-scan .scan-stats-text,
+#modal-scan .scan-log,
+#modal-scan .scan-complete-message,
+#modal-scan .modal-actions {
+  margin-left: 112px;
+}
+
+#modal-scan .progress-bar-container {
+  background: rgba(32, 32, 32, 0.08);
+}
+
+#modal-scan .modal-body::before {
+  content: '';
+  float: left;
+  width: 88px;
+  height: 296px;
+  background:
+    radial-gradient(rgba(252, 252, 252, 0.22) 1px, transparent 1.2px),
+    linear-gradient(180deg, rgba(56, 100, 148, 0.42), rgba(43, 154, 102, 0.22));
+  background-size: 5px 5px, 100% 100%;
+  border: 1px solid var(--divider-dark);
 }
 
 #modal-add .modal-header h3,
@@ -1359,8 +1472,35 @@ a:hover {
   overflow-y: auto;
   border: 1px solid var(--hairline);
   border-radius: var(--rounded-md);
-  background: var(--surface-bone);
+  background: var(--surface-dark);
   padding: var(--spacing-sm);
+  color: var(--on-dark);
+  scrollbar-color: var(--scrollbar-dark-thumb) var(--scrollbar-dark-track);
+}
+
+.scan-log::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.scan-log::-webkit-scrollbar-track {
+  background: var(--scrollbar-dark-track);
+  border-left: 1px solid var(--divider-dark);
+}
+
+.scan-log::-webkit-scrollbar-thumb {
+  background:
+    radial-gradient(rgba(32, 32, 32, 0.42) 1px, transparent 1.2px),
+    var(--scrollbar-dark-thumb);
+  background-size: 4px 4px, 100% 100%;
+  border: 2px solid var(--surface-dark);
+}
+
+.scan-log::-webkit-scrollbar-thumb:hover {
+  background:
+    radial-gradient(rgba(32, 32, 32, 0.36) 1px, transparent 1.2px),
+    var(--scrollbar-dark-thumb-hover);
+  background-size: 4px 4px, 100% 100%;
 }
 
 .scan-log-row {
@@ -1369,7 +1509,7 @@ a:hover {
   gap: var(--spacing-sm);
   align-items: center;
   padding: 6px 10px;
-  border-bottom: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--divider-dark);
   font: var(--body-sm);
   font-size: 13px;
 }
@@ -1382,13 +1522,13 @@ a:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--body-copy);
+  color: var(--on-dark-mute);
 }
 
 .scan-log-meta {
   font: var(--caption);
   font-size: 11px;
-  color: var(--charcoal);
+  color: rgba(252, 252, 252, 0.54);
   white-space: nowrap;
 }
 
@@ -2389,6 +2529,24 @@ body::after {
 
   .table-container {
     padding: 0;
+  }
+
+  #modal-scan .modal-body {
+    background: var(--surface-card);
+    min-height: 0;
+  }
+
+  #modal-scan .modal-body::before {
+    display: none;
+  }
+
+  #modal-scan .progress-bar-container,
+  #modal-scan .scan-current-text,
+  #modal-scan .scan-stats-text,
+  #modal-scan .scan-log,
+  #modal-scan .scan-complete-message,
+  #modal-scan .modal-actions {
+    margin-left: 0;
   }
 }
 
