@@ -315,9 +315,168 @@ a:hover {
 }
 
 /* --------------------------------------------------------------------------
-   Summary Bar — White Cards on Cream
+   Dashboard Summary — Operational Digest
    -------------------------------------------------------------------------- */
-.summary-bar {
+.dashboard-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: var(--spacing-xl) 0;
+  width: 100%;
+  background: var(--surface-dark);
+  color: var(--on-dark);
+  border: 1px solid var(--hairline-strong);
+}
+
+.summary-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 520px);
+  min-height: 152px;
+}
+
+.summary-copy {
+  padding: var(--spacing-xl);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-right: 1px solid var(--divider-dark);
+}
+
+.summary-eyebrow {
+  font: var(--caption-tight);
+  color: var(--on-dark-mute);
+  text-transform: uppercase;
+  letter-spacing: 0;
+  margin-bottom: var(--spacing-sm);
+}
+
+.summary-copy h2 {
+  font: var(--display-lg);
+  font-size: 42px;
+  line-height: 1.05;
+  letter-spacing: 0;
+  color: var(--on-dark);
+}
+
+.summary-copy p {
+  max-width: 620px;
+  margin-top: var(--spacing-md);
+  color: var(--on-dark-mute);
+  font: var(--body-sm);
+}
+
+.summary-health {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.summary-health-item,
+.summary-focus-item {
+  appearance: none;
+  border: 0;
+  border-left: 1px solid var(--divider-dark);
+  background: transparent;
+  color: var(--on-dark);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.summary-health-item {
+  min-width: 0;
+  padding: var(--spacing-xl) var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--spacing-xl);
+}
+
+.summary-health-item:first-child {
+  border-left: 0;
+}
+
+.summary-health-item span,
+.summary-focus-label {
+  color: var(--on-dark-mute);
+  font: var(--caption-tight);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.summary-health-item strong {
+  font-family: var(--font-display);
+  font-size: 52px;
+  line-height: 0.9;
+  letter-spacing: 0;
+}
+
+.summary-health-item.clean strong { color: var(--badge-success); }
+.summary-health-item.dirty strong { color: var(--warning); }
+.summary-health-item.error strong { color: var(--primary); }
+
+.summary-health-item:hover,
+.summary-focus-item:hover {
+  background: rgba(252, 252, 252, 0.08);
+}
+
+.summary-health-item:focus-visible,
+.summary-focus-item:focus-visible {
+  outline: 3px solid var(--ring-focus);
+  outline-offset: -3px;
+}
+
+.summary-meter {
+  display: flex;
+  height: 8px;
+  width: 100%;
+  background: rgba(252, 252, 252, 0.12);
+  border-top: 1px solid var(--divider-dark);
+}
+
+.summary-meter-segment {
+  display: block;
+  min-width: 0;
+  transition: flex-basis 0.2s;
+}
+
+.summary-meter-segment.clean { background: var(--badge-success); }
+.summary-meter-segment.dirty { background: var(--warning); }
+.summary-meter-segment.error { background: var(--primary); }
+
+.summary-focus {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  border-top: 1px solid var(--divider-dark);
+}
+
+.summary-focus-item {
+  min-height: 88px;
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.summary-focus-item:first-child {
+  border-left: 0;
+}
+
+.summary-focus-item strong {
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.summary-focus-item.alert strong {
+  color: var(--primary);
+}
+
+/* --------------------------------------------------------------------------
+   Summary Cards — Legacy Compact Stats
+   -------------------------------------------------------------------------- */
+.summary-bar:not(.dashboard-summary) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
   gap: var(--spacing-sm);
@@ -1497,7 +1656,24 @@ body::after {
     padding: 0 var(--spacing-lg);
   }
 
-  .summary-bar {
+  .dashboard-summary .summary-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-summary .summary-copy {
+    border-right: 0;
+    border-bottom: 1px solid var(--divider-dark);
+  }
+
+  .dashboard-summary .summary-focus {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dashboard-summary .summary-focus-item:nth-child(3n + 1) {
+    border-left: 0;
+  }
+
+  .summary-bar:not(.dashboard-summary) {
     grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
     gap: var(--spacing-xs);
   }
@@ -1542,7 +1718,38 @@ body::after {
     justify-content: center;
   }
 
-  .summary-bar {
+  .dashboard-summary .summary-copy {
+    padding: var(--spacing-lg);
+  }
+
+  .dashboard-summary .summary-copy h2 {
+    font-size: 32px;
+  }
+
+  .dashboard-summary .summary-health-item {
+    border-top: 1px solid var(--divider-dark);
+    min-height: 112px;
+    padding: var(--spacing-md);
+    gap: var(--spacing-md);
+  }
+
+  .dashboard-summary .summary-health-item:first-child {
+    border-left: 0;
+  }
+
+  .dashboard-summary .summary-health-item strong {
+    font-size: 40px;
+  }
+
+  .dashboard-summary .summary-focus {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-summary .summary-focus-item:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .summary-bar:not(.dashboard-summary) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

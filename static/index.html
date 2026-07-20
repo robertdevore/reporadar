@@ -35,18 +35,60 @@
   </script>
 
   <!-- Summary Bar -->
-  <div id="summary-bar" class="summary-bar">
-    <div class="summary-card"><span class="summary-label">Total</span><span class="summary-value" id="sum-total">-</span></div>
-    <div class="summary-card clean"><span class="summary-label">Clean</span><span class="summary-value" id="sum-clean">-</span></div>
-    <div class="summary-card dirty"><span class="summary-label">Dirty</span><span class="summary-value" id="sum-dirty">-</span></div>
-    <div class="summary-card ahead"><span class="summary-label">Ahead</span><span class="summary-value" id="sum-ahead">-</span></div>
-    <div class="summary-card behind"><span class="summary-label">Behind</span><span class="summary-value" id="sum-behind">-</span></div>
-    <div class="summary-card diverged"><span class="summary-label">Diverged</span><span class="summary-value" id="sum-diverged">-</span></div>
-    <div class="summary-card no-remote"><span class="summary-label">No Remote</span><span class="summary-value" id="sum-noremote">-</span></div>
-    <div class="summary-card error"><span class="summary-label">Errors</span><span class="summary-value" id="sum-errors">-</span></div>
-    <div class="summary-card stale"><span class="summary-label">Stale</span><span class="summary-value" id="sum-stale">-</span></div>
-    <div class="summary-card alerts"><span class="summary-label">Alerts</span><span class="summary-value" id="sum-alerts">-</span></div>
-  </div>
+  <section id="summary-bar" class="summary-bar dashboard-summary" aria-label="Repository health summary">
+    <div class="summary-hero">
+      <div class="summary-copy">
+        <span class="summary-eyebrow">Workspace posture</span>
+        <h2><span id="sum-total">-</span> repos tracked</h2>
+        <p id="sum-posture">Loading repository state...</p>
+      </div>
+      <div class="summary-health" aria-label="Clean, dirty, and error counts">
+        <button type="button" class="summary-health-item clean" data-summary-filter="clean">
+          <span>Clean</span>
+          <strong id="sum-clean">-</strong>
+        </button>
+        <button type="button" class="summary-health-item dirty" data-summary-filter="dirty">
+          <span>Dirty</span>
+          <strong id="sum-dirty">-</strong>
+        </button>
+        <button type="button" class="summary-health-item error" data-summary-filter="error">
+          <span>Errors</span>
+          <strong id="sum-errors">-</strong>
+        </button>
+      </div>
+    </div>
+    <div class="summary-meter" aria-hidden="true">
+      <span id="sum-meter-clean" class="summary-meter-segment clean"></span>
+      <span id="sum-meter-dirty" class="summary-meter-segment dirty"></span>
+      <span id="sum-meter-error" class="summary-meter-segment error"></span>
+    </div>
+    <div class="summary-focus">
+      <button type="button" class="summary-focus-item" data-summary-filter="ahead">
+        <span class="summary-focus-label">Ready to push</span>
+        <strong id="sum-ahead">-</strong>
+      </button>
+      <button type="button" class="summary-focus-item" data-summary-filter="behind">
+        <span class="summary-focus-label">Need pull</span>
+        <strong id="sum-behind">-</strong>
+      </button>
+      <button type="button" class="summary-focus-item" data-summary-filter="diverged">
+        <span class="summary-focus-label">Diverged</span>
+        <strong id="sum-diverged">-</strong>
+      </button>
+      <button type="button" class="summary-focus-item" data-summary-filter="no-remote">
+        <span class="summary-focus-label">No remote</span>
+        <strong id="sum-noremote">-</strong>
+      </button>
+      <button type="button" class="summary-focus-item" data-summary-filter="stale">
+        <span class="summary-focus-label">Stale</span>
+        <strong id="sum-stale">-</strong>
+      </button>
+      <button type="button" class="summary-focus-item alert" data-summary-filter="alerts">
+        <span class="summary-focus-label">Security alerts</span>
+        <strong id="sum-alerts">-</strong>
+      </button>
+    </div>
+  </section>
 
   <!-- Controls -->
   <div class="controls">
@@ -65,6 +107,7 @@
         <option value="no-remote">No Remote</option>
         <option value="error">Errors</option>
         <option value="stale">Stale</option>
+        <option value="alerts">Security Alerts</option>
       </select>
       <select id="filter-group" class="filter-select">
         <option value="">All Groups</option>

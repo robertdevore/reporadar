@@ -13,6 +13,7 @@ let sortOrder = 'asc';
 let currentFilter = 'all';
 let initialViewLoaded = false;
 let scanCloseTimer = null;
+let lastServerSummary = {};
 
 // === Init ===
 document.addEventListener('DOMContentLoaded', () => {
@@ -23,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function initPage() {
   await Promise.all([loadRepos(), loadSummary()]);
+  renderSummary(buildSummaryFromRepos(allRepos, lastServerSummary));
   loadFilterOptions();
   applyViewFromUrl();
   initialViewLoaded = true;
@@ -45,6 +47,9 @@ function setupEventListeners() {
   document.getElementById('filter-tag').addEventListener('change', renderTable);
   document.getElementById('btn-copy-view').addEventListener('click', copyCurrentViewLink);
   document.getElementById('btn-reset-view').addEventListener('click', resetView);
+  document.querySelectorAll('[data-summary-filter]').forEach(button => {
+    button.addEventListener('click', () => applySummaryFilter(button.dataset.summaryFilter));
+  });
   window.addEventListener('popstate', () => {
     applyViewFromUrl();
     renderTable(false);
@@ -89,6 +94,7 @@ async function loadRepos() {
     } else {
       document.getElementById('empty-state').classList.add('hidden');
       document.getElementById('repo-table').classList.remove('hidden');
+      renderSummary(buildSummaryFromRepos(allRepos, lastServerSummary));
       renderTable();
     }
   } catch (err) {
@@ -103,19 +109,99 @@ async function loadSummary() {
   try {
     const data = await apiFetch('/api/dashboard/summary');
     const s = data.summary || {};
-    document.getElementById('sum-total').textContent = s.total || 0;
-    document.getElementById('sum-clean').textContent = s.clean || 0;
-    document.getElementById('sum-dirty').textContent = s.dirty || 0;
-    document.getElementById('sum-ahead').textContent = s.ahead || 0;
-    document.getElementById('sum-behind').textContent = s.behind || 0;
-    document.getElementById('sum-diverged').textContent = s.diverged || 0;
-    document.getElementById('sum-noremote').textContent = s.no_remote || 0;
-    document.getElementById('sum-errors').textContent = s.errors || 0;
-    document.getElementById('sum-stale').textContent = s.stale || 0;
-    document.getElementById('sum-alerts').textContent = s.dependabot_alerts || 0;
+    lastServerSummary = s;
+    renderSummary(buildSummaryFromRepos(allRepos, s));
   } catch (err) {
     // Silently fail
   }
+}
+
+function buildSummaryFromRepos(repos, fallback = {}) {
+  if (!repos || repos.length === 0) return fallback || {};
+  const attentionRepos = repos.filter(repo =>
+    matchStatusFilter(repo, 'dirty') ||
+    matchStatusFilter(repo, 'error') ||
+    matchStatusFilter(repo, 'behind') ||
+    matchStatusFilter(repo, 'diverged') ||
+    matchStatusFilter(repo, 'stale') ||
+    matchStatusFilter(repo, 'alerts')
+  ).length;
+  return {
+    total: repos.length,
+    clean: repos.filter(repo => matchStatusFilter(repo, 'clean')).length,
+    dirty: repos.filter(repo => matchStatusFilter(repo, 'dirty')).length,
+    errors: repos.filter(repo => matchStatusFilter(repo, 'error')).length,
+    ahead: repos.filter(repo => matchStatusFilter(repo, 'ahead')).length,
+    behind: repos.filter(repo => matchStatusFilter(repo, 'behind')).length,
+    diverged: repos.filter(repo => matchStatusFilter(repo, 'diverged')).length,
+    no_remote: repos.filter(repo => matchStatusFilter(repo, 'no-remote')).length,
+    stale: repos.filter(repo => matchStatusFilter(repo, 'stale')).length,
+    dependabot_alerts: repos.filter(repo => matchStatusFilter(repo, 'alerts')).length,
+    attention_repos: attentionRepos,
+    last_full_scan: fallback.last_full_scan,
+    most_recently_active: fallback.most_recently_active
+  };
+}
+
+function renderSummary(summary) {
+  const total = Number(summary.total || 0);
+  const clean = Number(summary.clean || 0);
+  const dirty = Number(summary.dirty || 0);
+  const errors = Number(summary.errors || 0);
+  const ahead = Number(summary.ahead || 0);
+  const behind = Number(summary.behind || 0);
+  const diverged = Number(summary.diverged || 0);
+  const noRemote = Number(summary.no_remote || 0);
+  const stale = Number(summary.stale || 0);
+  const alerts = Number(summary.dependabot_alerts || 0);
+  const needsAttention = dirty + errors + behind + diverged + stale + alerts;
+  const attentionRepos = Number(summary.attention_repos || needsAttention);
+
+  setText('sum-total', total);
+  setText('sum-clean', clean);
+  setText('sum-dirty', dirty);
+  setText('sum-errors', errors);
+  setText('sum-ahead', ahead);
+  setText('sum-behind', behind);
+  setText('sum-diverged', diverged);
+  setText('sum-noremote', noRemote);
+  setText('sum-stale', stale);
+  setText('sum-alerts', alerts);
+  setSummaryMeter(total, clean, dirty, errors);
+
+  const posture = document.getElementById('sum-posture');
+  if (posture) {
+    if (total === 0) {
+      posture.textContent = 'Add repositories to start building the local command center.';
+    } else if (needsAttention === 0) {
+      posture.textContent = 'Everything scanned is clean, current, and quiet.';
+    } else {
+      posture.textContent = attentionRepos + ' repo' + (attentionRepos === 1 ? '' : 's') + ' need review before this workspace is quiet.';
+    }
+  }
+}
+
+function setSummaryMeter(total, clean, dirty, errors) {
+  const segments = [
+    ['sum-meter-clean', clean],
+    ['sum-meter-dirty', dirty],
+    ['sum-meter-error', errors]
+  ];
+  segments.forEach(([id, value]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const pct = total > 0 ? Math.max(0, (value / total) * 100) : 0;
+    el.style.flexBasis = pct + '%';
+    el.classList.toggle('hidden', pct === 0);
+  });
+}
+
+function applySummaryFilter(filter) {
+  const select = document.getElementById('filter-status');
+  if (!select || !filter) return;
+  select.value = filter;
+  renderTable();
+  document.querySelector('.controls')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function loadFilterOptions() {
@@ -232,6 +318,11 @@ function updateViewSummary(filteredCount) {
 function setElementValue(id, value) {
   const el = document.getElementById(id);
   if (el) el.value = value || '';
+}
+
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
 }
 
 function splitTokens(value) {
@@ -594,6 +685,7 @@ function matchStatusFilter(repo, filter) {
     case 'diverged': return repo.is_diverged === 1;
     case 'no-remote': return repo.has_remote === 0 || repo.has_remote === null;
     case 'error': return repo.scan_error && repo.scan_error !== '';
+    case 'alerts': return Number(repo.dependabot_alert_count || 0) > 0;
     case 'stale': {
       const staleDays = 14;
       if (!repo.latest_commit_date) return true;
