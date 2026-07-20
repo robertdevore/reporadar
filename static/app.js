@@ -123,12 +123,19 @@ function renderColumnMenu() {
   const menu = document.getElementById('column-menu');
   if (!menu) return;
   const visible = new Set(visibleColumns);
-  menu.innerHTML = TABLE_COLUMNS.map(col => {
+  menu.innerHTML = `
+    <div class="column-menu-header">
+      <span>Visible columns</span>
+      <button type="button" class="column-menu-reset">Show all</button>
+    </div>
+  ` + TABLE_COLUMNS.map(col => {
     const checked = visible.has(col.key) ? ' checked' : '';
     const disabled = col.locked ? ' disabled' : '';
+    const locked = col.locked ? ' locked' : '';
     return `
-      <label class="column-menu-item" role="menuitemcheckbox" aria-checked="${visible.has(col.key)}">
+      <label class="column-menu-item${locked}" role="menuitemcheckbox" aria-checked="${visible.has(col.key)}">
         <input type="checkbox" value="${col.key}"${checked}${disabled}>
+        <span class="column-menu-check" aria-hidden="true"></span>
         <span>${col.label}</span>
       </label>
     `;
@@ -136,6 +143,8 @@ function renderColumnMenu() {
   menu.querySelectorAll('input[type="checkbox"]').forEach(input => {
     input.addEventListener('change', updateColumnVisibilityFromMenu);
   });
+  const reset = menu.querySelector('.column-menu-reset');
+  if (reset) reset.addEventListener('click', showAllColumns);
 }
 
 function updateColumnVisibilityFromMenu() {
@@ -144,6 +153,13 @@ function updateColumnVisibilityFromMenu() {
     if (input.checked && input.value !== 'name') selected.push(input.value);
   });
   visibleColumns = selected;
+  saveVisibleColumns();
+  renderColumnMenu();
+  applyColumnVisibility();
+}
+
+function showAllColumns() {
+  visibleColumns = TABLE_COLUMNS.map(col => col.key);
   saveVisibleColumns();
   renderColumnMenu();
   applyColumnVisibility();
@@ -162,6 +178,7 @@ function toggleColumnMenu(event) {
   const button = document.getElementById('btn-columns');
   const nextOpen = menu.classList.contains('hidden');
   menu.classList.toggle('hidden', !nextOpen);
+  button.classList.toggle('active', nextOpen);
   button.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
 }
 
@@ -170,7 +187,10 @@ function closeColumnMenu() {
   const button = document.getElementById('btn-columns');
   if (!menu || menu.classList.contains('hidden')) return;
   menu.classList.add('hidden');
-  if (button) button.setAttribute('aria-expanded', 'false');
+  if (button) {
+    button.classList.remove('active');
+    button.setAttribute('aria-expanded', 'false');
+  }
 }
 
 // === API Calls ===
