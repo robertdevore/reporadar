@@ -110,7 +110,7 @@
   --rounded-full: 0px;
 
   /* === Layout === */
-  --content-width: 100%;
+  --content-width: 820px;
   --nav-height: 60px;
 }
 
@@ -746,6 +746,7 @@ a:hover {
   gap: var(--spacing-sm);
   flex: 1;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .column-menu-wrap {
