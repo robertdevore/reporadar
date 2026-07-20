@@ -965,6 +965,10 @@ export func serve_static(req) {
 	}
 
 	mut content = read_file(file_path)
+	if file_path == "static/style.css" && file_exists("static/fonts/DepartureMono-Regular.woff2") {
+		mut font_base64 = encode_base64(read_binary_file("static/fonts/DepartureMono-Regular.woff2"))
+		content = replace(content, "__DEPARTURE_MONO_WOFF2__", font_base64)
+	}
 	mut mime = get_mime_type(file_path)
 	mut resp = http_response(200, content)
 	resp = set_header(resp, "Content-Type", mime)

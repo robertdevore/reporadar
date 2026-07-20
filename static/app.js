@@ -168,6 +168,7 @@ function renderSummary(summary) {
   setText('sum-stale', stale);
   setText('sum-alerts', alerts);
   setSummaryMeter(total, clean, dirty, errors);
+  setSummaryDither(total, clean, dirty, errors, stale, noRemote, alerts);
 
   const posture = document.getElementById('sum-posture');
   if (posture) {
@@ -179,6 +180,25 @@ function renderSummary(summary) {
       posture.textContent = attentionRepos + ' repo' + (attentionRepos === 1 ? '' : 's') + ' need review before this workspace is quiet.';
     }
   }
+}
+
+function setSummaryDither(total, clean, dirty, errors, stale, noRemote, alerts) {
+  const bars = document.querySelectorAll('.summary-dither-field span');
+  if (!bars.length) return;
+  const values = [
+    clean, dirty, stale, noRemote, alerts, errors,
+    clean + dirty, stale + noRemote, clean, dirty + errors,
+    alerts + stale, noRemote, clean, stale, dirty, errors + alerts,
+    clean + noRemote, dirty + stale
+  ];
+  const max = Math.max(total, 1);
+  bars.forEach((bar, index) => {
+    const raw = Number(values[index % values.length] || 0);
+    const ripple = ((index * 17) % 31) + 10;
+    const pct = Math.min(100, Math.max(16, Math.round((raw / max) * 100) + ripple));
+    bar.style.setProperty('--h', pct + '%');
+    bar.className = index % 6 === 5 ? 'error' : (index % 3 === 1 ? 'attention' : 'clean');
+  });
 }
 
 function setSummaryMeter(total, clean, dirty, errors) {
