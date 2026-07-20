@@ -51,7 +51,7 @@ function renderDetail(data) {
     statusBadge = '<span class="badge badge-dirty">Dirty</span>';
   }
 
-  const pinned = repo.pinned === 1 ? ' <span class="badge badge-pinned">★ Pinned</span>' : '';
+  const pinned = repo.pinned === 1 ? ' <span class="badge badge-pinned">Pinned</span>' : '';
   const ahead = repo.ahead_count || 0;
   const behind = repo.behind_count || 0;
 
@@ -72,7 +72,7 @@ function renderDetail(data) {
 
     fileSection = `
       <div class="card card-full">
-        <h3>📁 File Changes (${fileChanges.length})</h3>
+        <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> File Changes (${fileChanges.length})</h3>
         ${stagedFiles.length > 0 ? '<h4 style="color:var(--success);margin-top:8px;">Staged (' + stagedFiles.length + ')</h4><div class="file-list">' + renderFiles(stagedFiles) + '</div>' : ''}
         ${unstagedFiles.length > 0 ? '<h4 style="color:var(--warning);margin-top:8px;">Unstaged (' + unstagedFiles.length + ')</h4><div class="file-list">' + renderFiles(unstagedFiles) + '</div>' : ''}
         ${untrackedFiles.length > 0 ? '<h4 style="color:var(--charcoal);margin-top:8px;">Untracked (' + untrackedFiles.length + ')</h4><div class="file-list">' + renderFiles(untrackedFiles) + '</div>' : ''}
@@ -111,7 +111,7 @@ function renderDetail(data) {
         ${scanHistory.slice(0, 5).map(s => `
           <div class="info-row">
             <span class="info-label">${s.scanned_at}</span>
-            <span class="info-value">${s.scan_error ? '⚠ ' + escHtml(s.scan_error) : '✓ Clean: ' + s.is_clean + ' | Branch: ' + escHtml(s.branch || 'N/A')}</span>
+            <span class="info-value">${s.scan_error ? '<span class="badge badge-error">Error</span> ' + escHtml(s.scan_error) : '<span class="badge badge-clean">Clean</span> ' + s.is_clean + ' | Branch: ' + escHtml(s.branch || 'N/A')}</span>
           </div>
         `).join('')}
       </div>
@@ -196,7 +196,7 @@ function showCommitDetails(index) {
       <div class="modal-content">
         <div class="modal-header">
           <h3>Commit Details</h3>
-          <button class="modal-close" onclick="closeCommitDetails()">✕</button>
+          <button class="modal-close" onclick="closeCommitDetails()" aria-label="Close commit details"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
         </div>
         <div class="modal-body" id="commit-details-body"></div>
       </div>

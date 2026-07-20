@@ -103,7 +103,7 @@ function renderLeastActive(repos) {
 function renderStale(repos) {
   const container = document.getElementById('stale-repos');
   if (repos.length === 0) {
-    container.innerHTML = '<p style="color:var(--success);">All repos have recent activity 🎉</p>';
+    container.innerHTML = '<p style="color:var(--success);">All repos have recent activity</p>';
     return;
   }
   container.innerHTML = repos.slice(0, 10).map(r => `

@@ -2,6 +2,8 @@
 
 let lastDiscoveryData = null;
 
+const discoverButtonLabel = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m13 13.5 2-2.5-2-2.5"/><path d="m21 21-4.3-4.3"/><path d="M9 8.5 7 11l2 2.5"/><circle cx="11" cy="11" r="8"/></svg> Scan Directory';
+
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-discover-start').addEventListener('click', startDiscovery);
   document.getElementById('btn-add-selected').addEventListener('click', addSelected);
@@ -27,7 +29,7 @@ async function startDiscovery() {
   document.getElementById('btn-add-selected').style.display = 'none';
   document.getElementById('btn-add-selected').disabled = true;
   document.getElementById('btn-discover-start').disabled = true;
-  document.getElementById('btn-discover-start').innerHTML = '⏳ Scanning...';
+  document.getElementById('btn-discover-start').textContent = 'Scanning...';
 
   try {
     const data = await apiFetch('/api/discover', {
@@ -60,7 +62,7 @@ async function startDiscovery() {
     showToast('Discovery failed: ' + err.message, 'error');
   } finally {
     document.getElementById('btn-discover-start').disabled = false;
-    document.getElementById('btn-discover-start').innerHTML = '🔍 Scan Directory';
+    document.getElementById('btn-discover-start').innerHTML = discoverButtonLabel;
     document.getElementById('btn-add-selected').disabled = false;
   }
 }
@@ -116,7 +118,7 @@ async function addSelected() {
     document.getElementById('btn-add-selected').style.display = 'none';
     document.getElementById('select-all-row').style.display = 'none';
     document.getElementById('result-list').innerHTML =
-      '<p style="color:var(--success);padding:12px;">✓ Added ' + result.added + ' repositories</p>';
+      '<p style="color:var(--success);padding:12px;"><span class="badge badge-clean">Added</span> ' + result.added + ' repositories</p>';
     lastDiscoveryData = null;
   } catch (err) {
     showToast('Failed to add repos: ' + err.message, 'error');

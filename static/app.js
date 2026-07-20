@@ -923,7 +923,7 @@ function renderRow(repo) {
     <tr class="${rowClass}">
       <td data-column="name">
         <a href="/detail.html?id=${repoId}" class="repo-link">${escHtml(name)}</a>
-        ${repo.pinned === 1 ? '<span class="badge badge-pinned">★</span>' : ''}
+        ${repo.pinned === 1 ? '<span class="badge badge-pinned">Pinned</span>' : ''}
       </td>
       <td data-column="group">${escHtml(repo.group_name || '-')}</td>
       <td data-column="tags">${tags || '-'}</td>

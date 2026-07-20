@@ -1125,6 +1125,13 @@ a:hover {
 .error-icon {
   font-size: 36px;
   margin-bottom: var(--spacing-lg);
+  color: var(--primary);
+}
+
+.empty-icon svg,
+.error-icon svg,
+.modal-close svg {
+  display: block;
 }
 
 .empty-state h2,
@@ -1635,6 +1642,24 @@ a:hover {
   font-size: 14px;
 }
 
+#detail-content h2,
+#detail-content h3,
+#detail-content h4,
+#modal-commit-details h3,
+#error-state h2 {
+  font-family: var(--font-display);
+  letter-spacing: 0;
+}
+
+#detail-content .btn,
+#detail-content button,
+#modal-commit-details .btn,
+#modal-commit-details button,
+#error-state .btn {
+  font-family: var(--font-display);
+  letter-spacing: 0;
+}
+
 .info-label {
   color: var(--charcoal);
   font-weight: 600;
@@ -1706,7 +1731,9 @@ a:hover {
 .status-count-box strong {
   color: var(--ink);
   font: var(--heading-sm);
+  font-family: var(--font-display);
   font-size: 18px;
+  letter-spacing: 0;
 }
 
 .file-list {
