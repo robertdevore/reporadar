@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0] — 2026-07-20
+
+### FEATURE
+- Dashboard column controls for customizing visible repository metadata
+- Decorative summary charts for faster dashboard scanning
+- Side-by-side repo commit and scan history views on detail pages
+- Collapsible recent commits and moved scan history for denser detail pages
+
+### TWEAK
+- Refined dashboard summary, action icons, table controls, column selector, and content width
+- Shifted the dashboard accent color and added dithered visual polish
+- Polished detail, settings, discovery, add modal, and scan modal typography
+- Condensed git change counts and improved remote and commit detail presentation
+- Removed duplicate latest commit presentation and linked commit hashes from more views
+- Removed rounded corners from the UI for a sharper visual system
+
 ## [0.2.0] — 2026-07-15
 
 ### FEATURE

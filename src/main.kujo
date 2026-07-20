@@ -8,7 +8,7 @@ from src.db import init_db, get_setting
 
 /// print_usage displays the help text.
 export func print_usage() {
-	print("RepoRadar v0.2.0 — Local Git Repository Dashboard")
+	print("RepoRadar v0.3.0 — Local Git Repository Dashboard")
 	print("")
 	print("Usage: kujo run src/main.kujo [command] [options]")
 	print("")
@@ -197,7 +197,7 @@ export func cmd_export() {
 
 	mut export_data = {
 		"app": "reporadar",
-		"version": "0.2.0",
+		"version": "0.3.0",
 		"exported_at": exported_at,
 		"settings": settings,
 		"repos": repos

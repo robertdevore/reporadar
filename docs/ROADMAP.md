@@ -1,6 +1,6 @@
 # Roadmap
 
-## v0.2.0 (Current checkpoint)
+## v0.2.0
 - [x] Repo registry (add, edit, remove)
 - [x] Git scanner (status, branch, commit, remote)
 - [x] Dashboard with sort, filter, search
@@ -12,7 +12,17 @@
 - [x] JSON export/import
 - [x] Database backup/restore
 
-## v0.3.0 (Planned)
+## v0.3.0 (Current checkpoint)
+- [x] Dashboard column controls
+- [x] Decorative summary charts
+- [x] Refined dashboard table controls and action icons
+- [x] Wider dashboard layout with constrained content width
+- [x] Detail page commit and scan history layout polish
+- [x] Settings, discovery, add modal, and scan modal typography polish
+- [x] Commit hash and remote detail presentation refinements
+- [x] Sharper visual system with square-edged UI
+
+## v0.4.0 (Planned)
 - [ ] Write action endpoints (stage, commit, push, pull)
 - [ ] Confirmation modal for write actions
 - [ ] Audit log for write actions
