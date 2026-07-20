@@ -19,6 +19,7 @@ let lastServerSummary = {};
 document.addEventListener('DOMContentLoaded', () => {
   applyViewFromUrl();
   setupEventListeners();
+  randomizeSummaryOrnaments();
   initPage();
 });
 
@@ -199,6 +200,29 @@ function setSummaryDither(total, clean, dirty, errors, stale, noRemote, alerts) 
     bar.style.setProperty('--h', pct + '%');
     bar.className = index % 6 === 5 ? 'error' : (index % 3 === 1 ? 'attention' : 'clean');
   });
+}
+
+function randomizeSummaryOrnaments() {
+  document.querySelectorAll('.chart-ornament').forEach((chart, index) => {
+    const a = randomInt(42, 132);
+    const b = a + randomInt(36, 118);
+    const c = b + randomInt(38, 122);
+    chart.style.setProperty('--a', a + 'deg');
+    chart.style.setProperty('--b', b + 'deg');
+    chart.style.setProperty('--c', c + 'deg');
+    chart.style.setProperty('--rot', randomInt(-28, 28) + 'deg');
+    chart.style.setProperty('--scale', (randomInt(92, 124) / 100).toFixed(2));
+    chart.style.setProperty('--phase', randomInt(-16, 16) + 'px');
+    chart.querySelectorAll('i').forEach((piece, pieceIndex) => {
+      piece.style.setProperty('--h', randomInt(24, 96) + '%');
+      piece.style.setProperty('--offset', randomInt(-14, 14) + 'px');
+      piece.style.setProperty('--delay', ((index + pieceIndex) % 5) * 18 + 'ms');
+    });
+  });
+}
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 function setSummaryMeter(total, clean, dirty, errors) {

@@ -431,6 +431,8 @@ a:hover {
 
 .summary-health-item,
 .summary-focus-item {
+  position: relative;
+  overflow: hidden;
   appearance: none;
   border: 0;
   border-left: 1px solid var(--divider-dark);
@@ -439,6 +441,12 @@ a:hover {
   text-align: left;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
+}
+
+.summary-health-item > *:not(.chart-ornament),
+.summary-focus-item > *:not(.chart-ornament) {
+  position: relative;
+  z-index: 1;
 }
 
 .summary-health-item {
@@ -454,7 +462,7 @@ a:hover {
   border-left: 0;
 }
 
-.summary-health-item span,
+.summary-health-item > span:not(.chart-ornament),
 .summary-focus-label {
   color: var(--on-dark-mute);
   font: var(--caption-tight);
@@ -534,6 +542,117 @@ a:hover {
 
 .summary-focus-item.alert strong {
   color: var(--primary);
+}
+
+.chart-ornament {
+  position: absolute;
+  right: -42px;
+  bottom: -38px;
+  width: 132px;
+  height: 132px;
+  z-index: 0;
+  opacity: 0.38;
+  color: rgba(252, 252, 252, 0.52);
+  pointer-events: none;
+  transform: rotate(var(--rot, 0deg)) scale(var(--scale, 1));
+  transform-origin: 50% 50%;
+  mix-blend-mode: screen;
+}
+
+.summary-health-item .chart-ornament {
+  right: -54px;
+  bottom: -46px;
+  width: 184px;
+  height: 184px;
+  opacity: 0.34;
+}
+
+.summary-health-item.clean .chart-ornament,
+.summary-focus-item:nth-child(1) .chart-ornament {
+  color: rgba(43, 154, 102, 0.72);
+}
+
+.summary-health-item.dirty .chart-ornament,
+.summary-focus-item:nth-child(2) .chart-ornament,
+.summary-focus-item:nth-child(5) .chart-ornament {
+  color: rgba(217, 119, 6, 0.7);
+}
+
+.summary-health-item.error .chart-ornament,
+.summary-focus-item.alert .chart-ornament {
+  color: rgba(234, 40, 4, 0.72);
+}
+
+.chart-pie,
+.chart-ring {
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 28%, rgba(32, 32, 32, 0.24) 29% 30%, transparent 31%),
+    conic-gradient(
+      from var(--rot, 0deg),
+      currentColor 0 var(--a, 86deg),
+      rgba(252, 252, 252, 0.16) var(--a, 86deg) var(--b, 178deg),
+      currentColor var(--b, 178deg) var(--c, 262deg),
+      rgba(252, 252, 252, 0.1) var(--c, 262deg) 360deg
+    );
+  box-shadow: inset 0 0 0 1px rgba(252, 252, 252, 0.16);
+}
+
+.chart-ring::after,
+.chart-pie::after {
+  content: '';
+  position: absolute;
+  inset: 13%;
+  border-radius: 50%;
+  background-image: radial-gradient(rgba(32, 32, 32, 0.5) 1px, transparent 1.25px);
+  background-size: 5px 5px;
+  opacity: 0.72;
+}
+
+.chart-ring::before {
+  content: '';
+  position: absolute;
+  inset: 30%;
+  border-radius: 50%;
+  background: var(--surface-dark);
+  z-index: 1;
+}
+
+.chart-bars,
+.chart-line {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 14px 18px;
+  border: 1px solid rgba(252, 252, 252, 0.12);
+  background:
+    linear-gradient(90deg, rgba(252, 252, 252, 0.1) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(252, 252, 252, 0.1) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.chart-bars i,
+.chart-line i {
+  display: block;
+  flex: 1;
+  height: var(--h, 50%);
+  min-height: 18%;
+  background:
+    radial-gradient(rgba(32, 32, 32, 0.52) 1px, transparent 1.2px),
+    currentColor;
+  background-size: 4px 4px, 100% 100%;
+  transform: translateY(var(--offset, 0));
+  transition: height 0.18s var(--delay, 0ms), transform 0.18s var(--delay, 0ms);
+}
+
+.chart-line {
+  align-items: center;
+}
+
+.chart-line i {
+  height: 8px;
+  min-height: 8px;
+  transform: translateY(var(--offset, 0)) skewY(-18deg);
 }
 
 /* --------------------------------------------------------------------------
