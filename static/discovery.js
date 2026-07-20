@@ -7,6 +7,12 @@ const discoverButtonLabel = '<svg xmlns="http://www.w3.org/2000/svg" width="16" 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-discover-start').addEventListener('click', startDiscovery);
   document.getElementById('btn-add-selected').addEventListener('click', addSelected);
+  document.getElementById('discover-path').addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      startDiscovery();
+    }
+  });
 });
 
 async function apiFetch(url, options = {}) {

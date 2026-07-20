@@ -1228,6 +1228,12 @@ a:hover {
   letter-spacing: 0;
 }
 
+#modal-add .modal-header h3,
+#modal-add .modal-actions .btn {
+  font-family: var(--font-display);
+  letter-spacing: 0;
+}
+
 .modal-close {
   background: none;
   border: none;
@@ -1431,9 +1437,10 @@ a:hover {
   bottom: var(--spacing-xl);
   right: var(--spacing-xl);
   padding: 12px 24px;
-  font: var(--body-sm);
+  font-family: var(--font-display);
   font-size: 14px;
   font-weight: 600;
+  letter-spacing: 0;
   z-index: 200;
   animation: toastIn 0.2s ease-out;
   border-radius: var(--rounded-full);
@@ -1851,8 +1858,45 @@ a:hover {
    Discovery Page
    -------------------------------------------------------------------------- */
 .discovery-container {
-  max-width: 800px;
-  margin: 0 auto;
+  max-width: 860px;
+  margin: var(--spacing-xl) auto 0;
+}
+
+.discovery-panel {
+  background: var(--surface-card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-md);
+  padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
+}
+
+.discovery-panel h3,
+.result-card h3,
+.discovery-panel .btn {
+  font-family: var(--font-display);
+  letter-spacing: 0;
+}
+
+.discovery-panel h3 svg,
+.result-card h3 svg {
+  color: var(--accent);
+}
+
+.discovery-copy {
+  color: var(--charcoal);
+  margin-bottom: var(--spacing-lg);
+}
+
+.discovery-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  margin-top: var(--spacing-md);
+}
+
+.discovery-panel .form-group input {
+  font-family: var(--font-display);
+  letter-spacing: 0;
 }
 
 .result-card {
