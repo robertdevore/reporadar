@@ -4,6 +4,7 @@
 from src.db import init_db, get_db_path, get_setting, set_setting, escape_sql
 from src.scanner import validate_git_repo, validate_repo_path, get_canonical_path, scan_repo_with_options, collect_recent_commits
 from src.registry import add_repo, remove_repo, update_repo, get_all_repos, get_repo_by_id, store_scan_result, store_repo_commits, get_repo_file_changes, get_repo_scan_history, get_repo_commits, get_commits_in_window, get_commits_by_day, get_commit_count_per_repo
+from src.version import app_version
 
 /// is_allowed_origin returns true for same-machine browser origins.
 export func is_allowed_origin(origin) {
@@ -32,6 +33,56 @@ export func request_origin(req) {
 	return origin
 }
 
+/// request_header reads a header across the common Kujo key casings.
+export func request_header(req, canonical_name, lowercase_name) {
+	mut headers = get_default(req, "headers", {})
+	mut value = get_default(headers, canonical_name, "")
+	if value == "" {
+		value = get_default(headers, lowercase_name, "")
+	}
+	return value
+}
+
+/// is_same_origin_request allows browser mutations only from the exact served origin.
+/// Origin-less clients remain supported for local CLI and agent integrations.
+export func is_same_origin_request(req) {
+	mut origin = request_origin(req)
+	if origin == null || origin == "" {
+		return true
+	}
+	mut host = request_header(req, "Host", "host")
+	if host == "" {
+		return false
+	}
+	return origin == "http://" + host
+}
+
+/// is_json_request accepts the standard JSON media type and optional parameters.
+export func is_json_request(req) {
+	mut content_type = request_header(req, "Content-Type", "content-type")
+	return content_type == "application/json" || starts_with(content_type, "application/json;")
+}
+
+/// mutation_request_error centralizes browser and resource-boundary validation.
+export func mutation_request_error(req, require_json) {
+	if !is_same_origin_request(req) {
+		return {"status": 403, "message": "Cross-origin request rejected"}
+	}
+	mut body = get_default(req, "body", "")
+	if len(body) > 1048576 {
+		return {"status": 413, "message": "Request body exceeds the 1 MiB limit"}
+	}
+	if require_json == 1 && !is_json_request(req) {
+		return {"status": 415, "message": "Content-Type must be application/json"}
+	}
+	return null
+}
+
+/// mutation_error_response converts a validation error into a protected JSON response.
+export func mutation_error_response(error, req) {
+	return add_cors(json_response(error["status"], {"success": false, "error": error["message"]}), req)
+}
+
 /// cors_headers returns CORS headers limited to localhost browser origins.
 export func cors_headers(req) {
 	mut origin = request_origin(req)
@@ -53,6 +104,7 @@ export func security_headers() {
 		"X-Content-Type-Options": "nosniff",
 		"Referrer-Policy": "no-referrer",
 		"X-Frame-Options": "DENY",
+		"Permissions-Policy": "camera=(), geolocation=(), microphone=()",
 		"Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:* http://localhost:*; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 	}
 }
@@ -124,6 +176,8 @@ export func api_add_repo(req) {
 	if req["method"] != "POST" {
 		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
+	mut request_error = mutation_request_error(req, 1)
+	if request_error != null { return mutation_error_response(request_error, req) }
 
 	mut body = req["body"]
 	mut data = parse_json(body)
@@ -154,6 +208,8 @@ export func api_remove_repo(req) {
 	if req["method"] != "DELETE" {
 		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
+	mut request_error = mutation_request_error(req, 0)
+	if request_error != null { return mutation_error_response(request_error, req) }
 
 	mut params = req["params"]
 	mut repo_id_str = get(params, "id")
@@ -177,6 +233,8 @@ export func api_update_repo(req) {
 	if req["method"] != "PUT" {
 		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
+	mut request_error = mutation_request_error(req, 1)
+	if request_error != null { return mutation_error_response(request_error, req) }
 
 	mut params = req["params"]
 	mut repo_id_str = get(params, "id")
@@ -210,6 +268,8 @@ export func api_scan_repo(req) {
 	if req["method"] != "POST" {
 		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
+	mut request_error = mutation_request_error(req, 0)
+	if request_error != null { return mutation_error_response(request_error, req) }
 
 	mut params = req["params"]
 	mut repo_id_str = get(params, "id")
@@ -479,6 +539,8 @@ export func api_bulk_scan(req) {
 	if req["method"] != "POST" {
 		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
+	mut request_error = mutation_request_error(req, 0)
+	if request_error != null { return mutation_error_response(request_error, req) }
 
 	mut db = init_db()
 	mut repos = get_all_repos(db)
@@ -544,6 +606,8 @@ export func api_discover(req) {
 	if req["method"] != "POST" {
 		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
+	mut request_error = mutation_request_error(req, 1)
+	if request_error != null { return mutation_error_response(request_error, req) }
 
 	mut body = req["body"]
 	mut data = parse_json(body)
@@ -601,9 +665,15 @@ export func api_discover(req) {
 
 /// discover_repos recursively searches for .git directories.
 export func discover_repos(parent_path, max_depth, include_hidden, ignored_folders) {
+	mut budget = {"entries_remaining": 25000, "results_remaining": 1000}
+	return discover_repos_with_budget(parent_path, max_depth, include_hidden, ignored_folders, budget)
+}
+
+/// discover_repos_with_budget shares deterministic entry/result limits across recursion.
+export func discover_repos_with_budget(parent_path, max_depth, include_hidden, ignored_folders, budget) {
 	mut results = []
 
-	if max_depth <= 0 {
+	if max_depth <= 0 || budget["entries_remaining"] <= 0 || budget["results_remaining"] <= 0 {
 		return results
 	}
 
@@ -614,6 +684,10 @@ export func discover_repos(parent_path, max_depth, include_hidden, ignored_folde
 	mut entries = list_dir(parent_path)
 	mut ei = 0
 	while ei < len(entries) {
+		if budget["entries_remaining"] <= 0 || budget["results_remaining"] <= 0 {
+			break
+		}
+		budget["entries_remaining"] = budget["entries_remaining"] - 1
 		mut entry = entries[ei]
 		ei = ei + 1
 
@@ -650,9 +724,10 @@ export func discover_repos(parent_path, max_depth, include_hidden, ignored_folde
 					"name": name,
 					"path": repo_path
 				})
+				budget["results_remaining"] = budget["results_remaining"] - 1
 			} else {
 				// Recurse
-				mut sub_results = discover_repos(full_path, max_depth - 1, include_hidden, ignored_folders)
+				mut sub_results = discover_repos_with_budget(full_path, max_depth - 1, include_hidden, ignored_folders, budget)
 				mut sr = 0
 				while sr < len(sub_results) {
 					results = push(results, sub_results[sr])
@@ -674,12 +749,17 @@ export func api_bulk_add(req) {
 	if req["method"] != "POST" {
 		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
+	mut request_error = mutation_request_error(req, 1)
+	if request_error != null { return mutation_error_response(request_error, req) }
 
 	mut body = req["body"]
 	mut data = parse_json(body)
 	mut repos_to_add = get(data, "repos")
 	if repos_to_add == null {
 		return add_cors(json_response(400, {"success": false, "error": "Repos array is required"}), req)
+	}
+	if len(repos_to_add) > 1000 {
+		return add_cors(json_response(413, {"success": false, "error": "Bulk add is limited to 1000 repositories"}), req)
 	}
 
 	mut db = init_db()
@@ -742,6 +822,8 @@ export func api_settings_update(req) {
 	if req["method"] != "PUT" {
 		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
+	mut request_error = mutation_request_error(req, 1)
+	if request_error != null { return mutation_error_response(request_error, req) }
 
 	mut body = req["body"]
 	mut data = parse_json(body)
@@ -752,6 +834,9 @@ export func api_settings_update(req) {
 
 	mut db = init_db()
 	mut setting_keys = keys(settings)
+	if len(setting_keys) > 50 {
+		return add_cors(json_response(413, {"success": false, "error": "Settings update is limited to 50 keys"}), req)
+	}
 	mut i = 0
 	while i < len(setting_keys) {
 		mut key = setting_keys[i]
@@ -781,7 +866,7 @@ export func api_export(req) {
 
 	mut export_data = {
 		"app": "reporadar",
-		"version": "0.4.0",
+		"version": app_version(),
 		"exported_at": "",
 		"settings": settings,
 		"repos": repos
@@ -806,6 +891,8 @@ export func api_import(req) {
 	if req["method"] != "POST" {
 		return add_cors(json_response(405, {"success": false, "error": "Method not allowed"}), req)
 	}
+	mut request_error = mutation_request_error(req, 1)
+	if request_error != null { return mutation_error_response(request_error, req) }
 
 	mut body = req["body"]
 	mut data = parse_json(body)
@@ -818,6 +905,9 @@ export func api_import(req) {
 	mut imported_repos = get(data, "repos")
 	if imported_repos == null {
 		return add_cors(json_response(400, {"success": false, "error": "Invalid import file: no repos found"}), req)
+	}
+	if len(imported_repos) > 1000 {
+		return add_cors(json_response(413, {"success": false, "error": "Import is limited to 1000 repositories"}), req)
 	}
 
 	mut db = init_db()
@@ -872,6 +962,9 @@ export func api_import(req) {
 	mut imported_settings = get(data, "settings")
 	if imported_settings != null {
 		mut setting_keys = keys(imported_settings)
+		if len(setting_keys) > 50 {
+			return add_cors(json_response(413, {"success": false, "error": "Imported settings are limited to 50 keys"}), req)
+		}
 		mut si = 0
 		while si < len(setting_keys) {
 			mut key = setting_keys[si]
@@ -1019,7 +1112,7 @@ export func setup_routes(server) {
 /// start_server initializes the database, sets up routes, and starts the HTTP server.
 export func start_server(port) {
 	print("")
-	print("=== RepoRadar v0.4.0 ===")
+	print("=== RepoRadar v" + app_version() + " ===")
 	print("")
 
 	mut db = init_db()

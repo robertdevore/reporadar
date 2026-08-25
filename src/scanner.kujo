@@ -8,6 +8,12 @@ export func shell_quote(value) {
 	return "'" + safe_value + "'"
 }
 
+/// git_inspect_prefix builds a read-only Git command prefix.
+/// It disables optional index locks and repository-selected fsmonitor helpers.
+export func git_inspect_prefix(repo_path) {
+	return "GIT_OPTIONAL_LOCKS=0 git -c core.fsmonitor=false -C " + shell_quote(repo_path)
+}
+
 /// path_has_git_marker checks for a local .git directory or file.
 /// This is a vendor-neutral fallback for repos Git cannot enter due to host OS permissions.
 export func path_has_git_marker(path) {
@@ -30,7 +36,7 @@ export func explain_git_command_failure(action, repo_path, stderr) {
 }
 
 export func validate_git_repo(path) {
-	mut result = execute_status("git -C " + shell_quote(path) + " rev-parse --is-inside-work-tree 2>/dev/null")
+	mut result = execute_status(git_inspect_prefix(path) + " rev-parse --is-inside-work-tree 2>/dev/null")
 	if result.success && result.exitcode == 0 {
 		mut stdout = trim(result.stdout)
 		if stdout == "true" {
@@ -57,7 +63,7 @@ export func validate_repo_path(path) {
 
 /// get_canonical_path returns the git repo root (top-level) path.
 export func get_canonical_path(repo_path) {
-	mut result = execute_status("git -C " + shell_quote(repo_path) + " rev-parse --show-toplevel 2>/dev/null")
+	mut result = execute_status(git_inspect_prefix(repo_path) + " rev-parse --show-toplevel 2>/dev/null")
 	if result.success && result.exitcode == 0 {
 		return trim(result.stdout)
 	}
@@ -67,7 +73,7 @@ export func get_canonical_path(repo_path) {
 /// get_current_branch returns the current branch name.
 /// Returns empty string if detached HEAD.
 export func get_current_branch(repo_path) {
-	mut result = execute_status("git -C " + shell_quote(repo_path) + " branch --show-current 2>/dev/null")
+	mut result = execute_status(git_inspect_prefix(repo_path) + " branch --show-current 2>/dev/null")
 	if result.success && result.exitcode == 0 {
 		return trim(result.stdout)
 	}
@@ -285,7 +291,7 @@ export func parse_commit_log_line(line) {
 /// get_latest_commit returns the latest commit info as a dict.
 /// Uses null-safe parsing.
 export func get_latest_commit(repo_path) {
-	mut result = execute_status("git -C " + shell_quote(repo_path) + " log -1 --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null")
+	mut result = execute_status(git_inspect_prefix(repo_path) + " log -1 --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null")
 	if !result.success || result.exitcode != 0 {
 		return {
 			"hash": "",
@@ -312,7 +318,7 @@ export func get_latest_commit(repo_path) {
 
 /// get_remote_url returns the origin remote URL, or empty string if none.
 export func get_remote_url(repo_path) {
-	mut result = execute_status("git -C " + shell_quote(repo_path) + " remote get-url origin 2>/dev/null")
+	mut result = execute_status(git_inspect_prefix(repo_path) + " remote get-url origin 2>/dev/null")
 	if result.success && result.exitcode == 0 {
 		return trim(result.stdout)
 	}
@@ -398,14 +404,14 @@ export func get_upstream_info(repo_path) {
 	}
 
 	// Get upstream branch name
-	mut upstream_result = execute_status("git -C " + shell_quote(repo_path) + " rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null")
+	mut upstream_result = execute_status(git_inspect_prefix(repo_path) + " rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null")
 	if upstream_result.success && upstream_result.exitcode == 0 {
 		info["upstream_branch"] = trim(upstream_result.stdout)
 	}
 
 	// Get ahead/behind counts (alternative to status parsing)
 	if info["upstream_branch"] != "" {
-		mut count_result = execute_status("git -C " + shell_quote(repo_path) + " rev-list --left-right --count HEAD...@{u} 2>/dev/null")
+		mut count_result = execute_status(git_inspect_prefix(repo_path) + " rev-list --left-right --count HEAD...@{u} 2>/dev/null")
 		if count_result.success && count_result.exitcode == 0 {
 			mut counts = trim(count_result.stdout)
 			mut parts = split(counts, "\t")
@@ -477,7 +483,7 @@ export func scan_repo_with_options(repo_path, enable_dependabot_alerts) {
 	// Get branch and status via porcelain
 	mut status_output = ""
 	try {
-		mut status_result = execute_status("git -C " + shell_quote(repo_path) + " status --porcelain=v1 --branch")
+		mut status_result = execute_status(git_inspect_prefix(repo_path) + " status --porcelain=v1 --branch")
 		if status_result.success && status_result.exitcode == 0 {
 			status_output = status_result.stdout
 		} else {
@@ -505,7 +511,7 @@ export func scan_repo_with_options(repo_path, enable_dependabot_alerts) {
 	if result["branch"] == "" || starts_with(result["branch"], "HEAD detached") {
 		result["is_detached"] = 1
 		// Try to get branch info via rev-parse
-		mut head_result = execute_status("git -C " + shell_quote(repo_path) + " rev-parse --abbrev-ref HEAD 2>/dev/null")
+		mut head_result = execute_status(git_inspect_prefix(repo_path) + " rev-parse --abbrev-ref HEAD 2>/dev/null")
 		if head_result.success && head_result.exitcode == 0 {
 			mut head_ref = trim(head_result.stdout)
 			if head_ref == "HEAD" {
@@ -568,9 +574,9 @@ export func collect_recent_commits(repo_path, days) {
 	mut command = ""
 
 	if days > 0 {
-		command = "git -C " + shell_quote(repo_path) + " log --since=\"" + to_string(days) + " days ago\" --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null"
+		command = git_inspect_prefix(repo_path) + " log --since=\"" + to_string(days) + " days ago\" --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null"
 	} else {
-		command = "git -C " + shell_quote(repo_path) + " log -20 --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null"
+		command = git_inspect_prefix(repo_path) + " log -20 --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null"
 	}
 
 	mut result = execute_status(command)

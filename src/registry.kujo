@@ -3,13 +3,21 @@
 from src.db import escape_sql
 from src.scanner import validate_repo_path, validate_git_repo, get_canonical_path
 
+/// normalize_binary_flag converts dynamic API/import values to SQLite-safe 0/1.
+export func normalize_binary_flag(value) {
+	if value == true || value == 1 || to_string(value) == "true" || to_string(value) == "1" {
+		return 1
+	}
+	return 0
+}
+
 /// add_repo validates and adds a repo to the registry.
 export func add_repo(db, path, display_name, group_name, tags, notes, pinned) {
 	if display_name == null { display_name = "" }
 	if group_name == null { group_name = "" }
 	if tags == null { tags = "" }
 	if notes == null { notes = "" }
-	if pinned == null { pinned = 0 }
+	pinned = normalize_binary_flag(pinned)
 
 	// Validate path
 	mut path_error = validate_repo_path(path)
@@ -85,10 +93,10 @@ export func update_repo(db, repo_id, display_name, group_name, tags, notes, pinn
 		updates = push(updates, "notes = '" + escape_sql(notes) + "'")
 	}
 	if pinned != null {
-		updates = push(updates, "pinned = " + to_string(pinned))
+		updates = push(updates, "pinned = " + to_string(normalize_binary_flag(pinned)))
 	}
 	if archived != null {
-		updates = push(updates, "archived = " + to_string(archived))
+		updates = push(updates, "archived = " + to_string(normalize_binary_flag(archived)))
 	}
 
 	if len(updates) == 0 {

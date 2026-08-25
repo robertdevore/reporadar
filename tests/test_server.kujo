@@ -1,0 +1,36 @@
+// RepoRadar HTTP boundary unit tests
+
+from src.server import is_same_origin_request, is_json_request, mutation_request_error, security_headers
+
+test_group "HTTP mutation boundary" {
+	test "exact same-origin browser request is allowed" {
+		let req = {"headers": {"Origin": "http://127.0.0.1:8080", "Host": "127.0.0.1:8080", "Content-Type": "application/json"}, "body": "{}"}
+		assert_true(is_same_origin_request(req))
+		assert_true(is_json_request(req))
+		assert_equal(mutation_request_error(req, 1), null)
+	}
+
+	test "cross-origin browser request is rejected" {
+		let req = {"headers": {"Origin": "https://attacker.example", "Host": "127.0.0.1:8080", "Content-Type": "text/plain"}, "body": "{}"}
+		let error = mutation_request_error(req, 1)
+		assert_equal(error["status"], 403)
+	}
+
+	test "Origin-less agents remain supported but JSON media type is enforced" {
+		let req = {"headers": {"Host": "127.0.0.1:8080", "Content-Type": "text/plain"}, "body": "{}"}
+		let error = mutation_request_error(req, 1)
+		assert_true(is_same_origin_request(req))
+		assert_equal(error["status"], 415)
+	}
+
+	test "oversized mutation bodies are rejected" {
+		let req = {"headers": {"Host": "127.0.0.1:8080", "Content-Type": "application/json"}, "body": repeat("x", 1048577)}
+		let error = mutation_request_error(req, 1)
+		assert_equal(error["status"], 413)
+	}
+
+	test "defensive headers include a permissions policy" {
+		let headers = security_headers()
+		assert_true(has_key(headers, "Permissions-Policy") == 1)
+	}
+}

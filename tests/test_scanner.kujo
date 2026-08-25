@@ -1,7 +1,7 @@
 // RepoRadar Scanner Unit Tests
 // Run: kujo test-run tests/test_scanner.kujo
 
-from src.scanner import parse_git_status, parse_commit_log_line, validate_repo_path, shell_quote, path_has_git_marker, validate_git_repo, explain_git_command_failure, parse_github_repo_slug, parse_dependabot_alert_count_output
+from src.scanner import parse_git_status, parse_commit_log_line, validate_repo_path, shell_quote, git_inspect_prefix, path_has_git_marker, validate_git_repo, explain_git_command_failure, parse_github_repo_slug, parse_dependabot_alert_count_output
 
 // === parse_git_status Tests ===
 
@@ -180,6 +180,12 @@ test_group "shell_quote" {
 		let expected = "'" + "Bob" + "'\"'\"'" + "s Repo" + "'"
 		let result = shell_quote("Bob's Repo")
 		assert_equal(result, expected)
+	}
+
+	test "Git inspection disables optional locks and fsmonitor helpers" {
+		let command = git_inspect_prefix("/tmp/repo")
+		assert_true(starts_with(command, "GIT_OPTIONAL_LOCKS=0 git -c core.fsmonitor=false -C "))
+		assert_true(ends_with(command, "'/tmp/repo'"))
 	}
 }
 
