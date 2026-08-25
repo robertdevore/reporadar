@@ -1294,7 +1294,7 @@ a:hover {
 }
 
 #modal-scan .modal-content {
-  max-width: 620px;
+  max-width: 600px;
   overflow: hidden;
 }
 
@@ -1310,35 +1310,11 @@ a:hover {
 
 #modal-scan .modal-body {
   padding: var(--spacing-xl);
-  background:
-    linear-gradient(90deg, var(--surface-dark) 0 112px, transparent 112px),
-    var(--surface-card);
-  min-height: 360px;
-}
-
-#modal-scan .progress-bar-container,
-#modal-scan .scan-current-text,
-#modal-scan .scan-stats-text,
-#modal-scan .scan-log,
-#modal-scan .scan-complete-message,
-#modal-scan .modal-actions {
-  margin-left: 112px;
+  background: var(--surface-card);
 }
 
 #modal-scan .progress-bar-container {
   background: rgba(32, 32, 32, 0.08);
-}
-
-#modal-scan .modal-body::before {
-  content: '';
-  float: left;
-  width: 88px;
-  height: 296px;
-  background:
-    radial-gradient(rgba(252, 252, 252, 0.22) 1px, transparent 1.2px),
-    linear-gradient(180deg, rgba(56, 100, 148, 0.42), rgba(43, 154, 102, 0.22));
-  background-size: 5px 5px, 100% 100%;
-  border: 1px solid var(--divider-dark);
 }
 
 #modal-add .modal-header h3,
@@ -1378,6 +1354,44 @@ a:hover {
   margin-top: var(--spacing-xl);
   padding-top: var(--spacing-xl);
   border-top: 1px solid var(--hairline);
+}
+
+.modal-confirm {
+  max-width: 460px;
+}
+
+.modal-confirm .modal-body {
+  position: relative;
+  padding-left: 88px;
+}
+
+.modal-confirm p {
+  color: var(--body-copy);
+  font-size: 15px;
+}
+
+.modal-confirm strong {
+  color: var(--ink);
+}
+
+.confirm-mark {
+  position: absolute;
+  top: 0;
+  left: var(--spacing-xl);
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  background: rgba(234, 40, 4, 0.07);
+  border: 1px solid rgba(234, 40, 4, 0.2);
+}
+
+.confirm-note {
+  margin-top: var(--spacing-sm);
+  color: var(--mute) !important;
+  font-size: 13px !important;
 }
 
 /* --------------------------------------------------------------------------
@@ -2349,12 +2363,22 @@ a:hover {
 }
 
 /* --------------------------------------------------------------------------
-   Footer Spacer
+   Footer
    -------------------------------------------------------------------------- */
-body::after {
-  content: '';
-  display: block;
-  height: var(--spacing-section);
+.site-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-xxxl);
+  padding: var(--spacing-lg) 0 var(--spacing-xxxl);
+  border-top: 1px solid var(--hairline);
+  color: var(--mute);
+  font: var(--caption);
+}
+
+.site-footer a {
+  font-family: var(--font-display);
+  color: var(--accent);
 }
 
 /* --------------------------------------------------------------------------
@@ -2536,17 +2560,9 @@ body::after {
     min-height: 0;
   }
 
-  #modal-scan .modal-body::before {
-    display: none;
-  }
-
-  #modal-scan .progress-bar-container,
-  #modal-scan .scan-current-text,
-  #modal-scan .scan-stats-text,
-  #modal-scan .scan-log,
-  #modal-scan .scan-complete-message,
-  #modal-scan .modal-actions {
-    margin-left: 0;
+  .site-footer {
+    flex-direction: column;
+    gap: var(--spacing-xs);
   }
 }
 

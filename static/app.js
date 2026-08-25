@@ -29,6 +29,7 @@ let sortOrder = 'asc';
 let currentFilter = 'all';
 let initialViewLoaded = false;
 let scanCloseTimer = null;
+let pendingRemoveRepo = null;
 let lastServerSummary = {};
 let visibleColumns = loadVisibleColumns();
 
@@ -58,6 +59,8 @@ function setupEventListeners() {
   document.getElementById('btn-add-confirm').addEventListener('click', addRepo);
   document.getElementById('btn-edit-confirm').addEventListener('click', saveEdit);
   document.getElementById('btn-scan-close').addEventListener('click', () => closeModal('modal-scan'));
+  document.getElementById('btn-remove-cancel').addEventListener('click', () => closeModal('modal-remove'));
+  document.getElementById('btn-remove-confirm').addEventListener('click', confirmRemoveRepo);
 
   document.getElementById('search-input').addEventListener('input', debounce(renderTable, 300));
   document.getElementById('filter-status').addEventListener('change', renderTable);
@@ -555,27 +558,39 @@ async function scanRepo(repoId) {
   }
 }
 
-async function removeRepo(repoId, name) {
-  if (!confirm('Remove "' + name + '" from tracking? (No files will be deleted)')) return;
+async function confirmRemoveRepo() {
+  if (!pendingRemoveRepo) return;
+  const repoId = pendingRemoveRepo.id;
+  const confirmButton = document.getElementById('btn-remove-confirm');
+  confirmButton.disabled = true;
+  confirmButton.textContent = 'Removing...';
   try {
     const result = await apiFetch('/api/repos/' + repoId, { method: 'DELETE' });
     if (result.success) {
+      closeModal('modal-remove');
       showToast('Repository removed from tracking', 'success');
-      loadRepos();
-      loadSummary();
+      await Promise.all([loadRepos(), loadSummary()]);
       loadFilterOptions();
     } else {
       showToast(result.error, 'error');
     }
   } catch (err) {
     showToast('Failed to remove repository', 'error');
+  } finally {
+    confirmButton.disabled = false;
+    confirmButton.textContent = 'Remove Repository';
   }
 }
 
 function removeRepoById(repoId) {
   const repo = findRepoById(repoId);
   if (!repo) return;
-  removeRepo(repo.id, repo.display_name || repo.name || 'this repository');
+  pendingRemoveRepo = {
+    id: repo.id,
+    name: repo.display_name || repo.name || 'this repository'
+  };
+  document.getElementById('remove-repo-name').textContent = pendingRemoveRepo.name;
+  openModal('modal-remove');
 }
 
 function openEditModal(repo) {
@@ -1049,6 +1064,7 @@ function openModal(id) {
 function closeModal(id) {
   document.getElementById(id).classList.add('hidden');
   if (id === 'modal-add') clearAddForm();
+  if (id === 'modal-remove') pendingRemoveRepo = null;
   if (id === 'modal-scan' && scanCloseTimer) {
     clearTimeout(scanCloseTimer);
     scanCloseTimer = null;
