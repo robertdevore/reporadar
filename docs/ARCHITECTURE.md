@@ -8,6 +8,8 @@ RepoRadar is a **local-first** Git repository dashboard built in the **Kujo prog
 2. **Static Frontend** — HTML/CSS/JS served by Kujo's built-in HTTP server
 3. **SQLite Database** — Local storage at `~/.reporadar.db`
 
+`version.kujo` is the single source for the application version used by CLI and HTTP responses. `health_report.kujo` owns the normalized human/agent status contract.
+
 ## Component Diagram
 
 ```
@@ -54,9 +56,11 @@ RepoRadar is a **local-first** Git repository dashboard built in the **Kujo prog
 - `settings` — Key-value configuration
 - `schema_version` — Migration tracking
 
+Database initialization enables foreign keys, a five-second busy timeout, WAL mode, and normal synchronous durability. Schema v2 adds indexes for latest-snapshot and date-first activity access and performs one-time commit deduplication before enforcing uniqueness.
+
 ## Safe Git Commands Used
 
-All Git operations use safe, read-only subcommands:
+All Git operations use safe, read-only subcommands prefixed by `GIT_OPTIONAL_LOCKS=0 git -c core.fsmonitor=false -C <validated-path>`:
 - `git rev-parse --is-inside-work-tree`
 - `git rev-parse --show-toplevel`
 - `git branch --show-current`
@@ -73,3 +77,6 @@ All Git operations use safe, read-only subcommands:
 - SQL injection mitigated via the shared `escape_sql(...)` helper
 - No telemetry, analytics, or data upload
 - Frontend served locally; no CDN dependencies
+- Mutating browser requests require an exact same origin and JSON media type where applicable
+- HTTP bodies, bulk collections, and recursive discovery are bounded
+- Origin-less localhost clients remain supported for terminal and agent automation

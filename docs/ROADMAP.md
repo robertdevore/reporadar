@@ -6,6 +6,12 @@
 - [x] Dirty and attention filters
 - [x] Automation-friendly exit codes
 - [x] Richer terminal health summaries
+- [x] Runtime and database diagnostics via `doctor`
+- [x] Centralized version reporting for CLI and HTTP clients
+- [x] Same-origin mutation enforcement and bounded HTTP/discovery inputs
+- [x] Hardened Git inspection that suppresses filesystem-monitor helpers
+- [x] SQLite schema v2, concurrency settings, and query indexes
+- [x] Linux/macOS continuous integration
 
 ## v0.2.0
 - [x] Repo registry (add, edit, remove)
@@ -33,7 +39,7 @@
 - [ ] Write action endpoints (stage, commit, push, pull)
 - [x] Styled confirmation modal for repository removal
 - [ ] Audit log for write actions
-- [ ] Comprehensive test suite
+- [x] Cross-runtime, CLI-contract, server-policy, and live HTTP regression suites
 - [ ] Real-time scan progress via polling
 - [ ] Scheduled/periodic scanning
 
@@ -49,6 +55,7 @@
 - No real-time file watching (polling only)
 - No Git operations beyond basic status/commit queries
 - No multi-user support (single local user)
+- No authentication; the HTTP server must remain localhost-only
 - No cloud sync (by design)
 - Requires Git to be installed separately
 - Kujo v1.0.0+ required; may not work with older versions

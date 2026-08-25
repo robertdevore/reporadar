@@ -5,13 +5,17 @@
 ```
 reporadar/
   README.md         # Top-level project overview
-  kujo.toml           # Project configuration
+  LICENSE           # MIT license
+  kujo.toml         # Project configuration
+  .github/           # Continuous integration
   src/
     main.kujo         # CLI entry point
     server.kujo       # HTTP server + API routes
     db.kujo           # Database layer (SQLite)
     scanner.kujo      # Git scanner
     registry.kujo     # Repo registry CRUD
+    health_report.kujo # Stable human and JSON health model
+    version.kujo      # Canonical application version
   static/
     index.html        # Main dashboard
     app.js            # Dashboard frontend
@@ -24,7 +28,7 @@ reporadar/
     discovery.js
     settings.html     # Settings page
     settings.js
-  tests/              # Test suites
+  tests/              # Kujo suites and contract/smoke harnesses
   docs/               # Documentation
   agent/              # Handoff and session planning notes
 ```
@@ -45,6 +49,8 @@ kujo run src/main.kujo list
 kujo run src/main.kujo scan <id>
 kujo run src/main.kujo scan-all
 kujo run src/main.kujo review --scan --json
+kujo run src/main.kujo doctor --json
+kujo run src/main.kujo version --json
 ```
 
 See [CLI and Agent Integration](CLI.md) for the JSON schema, filters, and exit-code contract.
@@ -76,3 +82,5 @@ See [CLI and Agent Integration](CLI.md) for the JSON schema, filters, and exit-c
 - `GET /api/export` — Export JSON
 - `POST /api/import` — Import JSON
 - `GET /api/export/db` — Download database backup
+
+Mutation endpoints enforce exact same-origin browser requests, JSON media types where applicable, a 1 MiB request-body limit, and bounded collection sizes. Origin-less local clients remain supported for CLI and agent tooling.

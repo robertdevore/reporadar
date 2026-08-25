@@ -21,6 +21,7 @@ Current release: **v0.4.0**
 - Serves dashboard, detail, activity, discovery, and settings views
 - Stores everything locally in SQLite with no telemetry or cloud dependency
 - Provides agent-friendly JSON health reports, attention filters, and automation exit codes
+- Provides `doctor` and `version` commands for environment discovery and agent preflight checks
 
 ## Requirements
 
@@ -62,6 +63,9 @@ kujo run src/main.kujo discover /path/to/parent
 
 # Export the registry to JSON
 kujo run src/main.kujo export
+
+# Verify the local runtime, database, and registry
+kujo run src/main.kujo doctor --json
 ```
 
 ## Configuration
@@ -80,33 +84,42 @@ All runtime settings are stored locally in SQLite and can be managed from the Se
 
 ```text
 reporadar/
+  .github/    # Linux and macOS CI
+  LICENSE
   README.md
   kujo.toml
   src/        # Kujo application code
   static/     # Browser UI assets
-  tests/      # Scanner, registry, and integration tests
+  tests/      # Kujo suites and Python contract/smoke harnesses
   docs/       # Longer-form docs and operational guidance
   agent/      # Handoff, review, and planning notes
 ```
 
-The distributable project root is intentionally small. Prompt packs, handoff notes, and future-session planning live under `agent/` so the root stays focused on files a new user expects first.
+The distributable root is intentionally small. Historical reviews live under `docs/archive/`, current follow-up reviews under `docs/reviews/`, and application code under `src/`.
 
 ## Testing
 
 Run the full suite from the project root:
 
 ```bash
-kujo test
+kujo test --runtime dual
+python3 tests/cli_contract_harness.py
+python3 tests/server_smoke_harness.py
+
+# Static checks
+for source in src/*.kujo; do kujo check "$source"; done
+for source in static/*.js; do node --check "$source"; done
 ```
 
 ## Security model
 
 - Binds to `127.0.0.1` only
-- Limits browser CORS reflection to localhost origins
-- Sends defensive browser headers for content type sniffing, referrer leakage, and framing
-- Uses read-only Git inspection commands
+- Requires exact same-origin browser mutation requests and JSON media types
+- Caps request bodies, bulk collections, and recursive discovery work
+- Sends defensive browser headers for content type sniffing, referrer leakage, framing, and browser permissions
+- Uses read-only Git inspection commands with Git filesystem monitors disabled
 - Avoids telemetry, analytics, and remote data upload
-- Keeps secrets and repo metadata in local SQLite storage
+- Keeps repo metadata in local SQLite storage with foreign keys, WAL, a busy timeout, migrations, and query indexes
 - Escapes SQL and shell-sensitive values in the scan and persistence paths
 - Rejects static path traversal attempts before serving browser assets
 - Keeps remote security enrichment opt-in; Dependabot alert checks require the user to enable them and authenticate `gh`
@@ -131,4 +144,10 @@ kujo test
 
 ## Status
 
-The project is useful and increasingly polished, but not yet "enterprise complete" in the universal sense. The next hardening pass should focus on CI, broader platform testing, auth/threat-model decisions for non-local deployments, and measured scan performance. See `docs/NEXT_SESSION_ENTERPRISE_REVIEW_2026-06-20.md` for the newest follow-up list.
+RepoRadar is production-ready for its documented scope: a single trusted user operating a localhost-only dashboard or CLI on macOS, Linux, or WSL. It is not a multi-user service and should not be exposed to a network without authentication, authorization, TLS, and a deployment-specific threat model.
+
+This repository intentionally serves as a substantial Kujo example: one codebase exercises CLI contracts, HTTP routing, JSON APIs, SQLite migrations, subprocess isolation, filesystem discovery, browser UI, and cross-runtime tests. The [next enterprise review](docs/reviews/NEXT_SESSION_ENTERPRISE_REVIEW_2026-08-25.md) tracks the evidence and controls still required for broader deployment claims.
+
+## License
+
+[MIT](LICENSE) © Robert DeVore

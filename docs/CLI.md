@@ -41,6 +41,18 @@ kujo run src/main.kujo scan-all --json
 kujo run src/main.kujo scan 12 --json --fail-on-attention
 ```
 
+## Runtime discovery
+
+Use `doctor` as a non-mutating preflight for human operators, scripts, and agents:
+
+```bash
+kujo run src/main.kujo doctor
+kujo run src/main.kujo doctor --json
+kujo run src/main.kujo version --json
+```
+
+`doctor --json` reports application, Kujo, and Git versions; database path and schema version; tracked repository count; an overall `success` boolean; and exit code `0` or `1`. `version --json` emits only the application identity, version, and success metadata. Unknown options and invalid arguments use exit code `2` and remain valid JSON in JSON mode.
+
 Supported health filters are:
 
 - `--dirty-only` — Include only repositories whose working tree has changes.
@@ -95,6 +107,8 @@ REPORADAR_DB="$HOME/.reporadar.db" \
 ```
 
 If the dashboard uses a custom `REPORADAR_DB`, the scheduled command must use that same value. On macOS, the process running the schedule must be allowed to read every registered repository.
+
+Run `doctor --json` before a scheduled review when the automation should distinguish environment failures from repository attention items.
 
 ## Suggested agent instruction
 

@@ -7,11 +7,24 @@
 - JSON output for list, single-scan, bulk-scan, and review workflows
 - Dirty-only and attention-only repository filters
 - Normalized attention reasons and priority levels for automated triage
+- `doctor` and `version` commands with machine-readable JSON contracts
+- Linux and macOS CI with checksum-verified Kujo installation
 
 ### TWEAK
 - Detailed human-readable repository health output
 - Stable automation exit codes for operational errors, invalid usage, and attention findings
 - CLI bulk scans now persist scan-run summaries like the HTTP bulk-scan endpoint
+- Centralized application version reporting
+- SQLite schema v2 with WAL, foreign-key enforcement, busy timeout, one-time commit deduplication, and query indexes
+- Bounded recursive discovery and bulk API collections
+- Root cleanup, MIT license, corrected documentation links, and a prioritized follow-up review
+
+### SECURITY
+- Exact same-origin enforcement for browser mutations while retaining origin-less local automation
+- JSON content-type enforcement and a 1 MiB mutation-body limit
+- Read-only Git inspection disables repository-configured filesystem-monitor helpers and optional index locking
+- Repository boolean flags are normalized before SQL construction
+- Detail-view copy actions no longer interpolate repository paths into inline JavaScript
 
 ## [0.4.0] — 2026-08-25
 

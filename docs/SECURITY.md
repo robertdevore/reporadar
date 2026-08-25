@@ -22,9 +22,10 @@ The HTTP server explicitly binds to `127.0.0.1` using `http_listen("127.0.0.1", 
 All Git operations use safe, read-only subcommands:
 - No `git commit`, `git push`, `git pull`, `git reset`, `git rebase`, `git stash`, `git checkout`, `git merge`
 - Commands are executed with validated paths
+- Every inspection uses `GIT_OPTIONAL_LOCKS=0` and `-c core.fsmonitor=false` so read-only scans neither acquire optional index locks nor execute repository-configured filesystem-monitor helpers
 - Output is parsed defensively; malformed output is handled gracefully
 
-When write actions (Phase 07) are implemented:
+If write actions are implemented in the future:
 - They are **disabled by default** via settings toggle
 - Each action requires explicit user confirmation
 - The exact command is displayed before execution
@@ -50,12 +51,17 @@ Leave this setting disabled for fully offline/local-only operation or environmen
 - SQL values are escaped via the shared `escape_sql(...)` helper
 - JSON import validates structure before processing
 - Static asset requests reject `..` segments and backslashes before touching the filesystem
+- Browser mutation requests must match the exact `http://<Host>` origin; origin-less local clients remain available for terminal and agent integrations
+- JSON mutation endpoints require `Content-Type: application/json`
+- Request bodies are capped at 1 MiB, bulk collections at 1,000 entries, settings updates at 50 keys, and discovery at 25,000 visited entries/1,000 results
 
 ## Data Storage
 
 - SQLite database at `~/.reporadar.db` (configurable via `REPORADAR_DB`)
 - No credentials or tokens stored
 - Commit messages and repo paths are the most sensitive data stored
+- Connections enable foreign-key enforcement, a 5-second busy timeout, WAL journaling, and normal synchronous durability
+- Indexed latest-snapshot and date-first activity queries avoid repeated full-history scans
 - Scan snapshots and file-change rows are trimmed to the newest 250 snapshots per repository to keep long-lived registries bounded
 - Database can be backed up and restored via Settings page
 
@@ -65,7 +71,11 @@ Leave this setting disabled for fully offline/local-only operation or environmen
 - Content is escaped (`escHtml`) before rendering to prevent XSS
 - Dashboard action buttons resolve repositories by numeric ID instead of embedding repository JSON in inline handlers
 - CORS headers only reflect same-machine browser origins (`127.0.0.1`, `localhost`, and `[::1]`)
-- Responses include defensive browser headers: `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, and a local-only Content Security Policy
+- Responses include defensive browser headers: `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, `Permissions-Policy`, and a local-only Content Security Policy
+
+## Trust Boundary
+
+RepoRadar has no user authentication because it is a single-user localhost application. Other processes running as the same operating-system user can generally access the same repositories and database directly. Do not bind or proxy RepoRadar to a LAN or the public internet. A networked or multi-user deployment requires a separate threat model plus authentication, authorization, and TLS.
 
 ## Reporting Issues
 

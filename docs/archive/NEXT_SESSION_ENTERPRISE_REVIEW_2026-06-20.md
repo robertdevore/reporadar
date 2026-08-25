@@ -1,4 +1,4 @@
-# Next Session Enterprise Review List - 2026-06-20
+# Next Session Enterprise Review List - 2026-06-20 (Historical)
 
 This follow-up list comes from the RepoRadar enterprise-readiness review and hardening pass completed on June 20, 2026.
 

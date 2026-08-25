@@ -46,22 +46,25 @@ Open `http://127.0.0.1:8080` in your browser.
 
 ## Architecture
 
-See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
 
 ## Security
 
-RepoRadar is **local-first** and **read-only by default**. No data leaves your machine. See [SECURITY.md](docs/SECURITY.md).
+RepoRadar is **local-first** and **read-only by default**. Core scans remain local; optional Dependabot enrichment sends the parsed GitHub repository identity through an authenticated `gh` client. See [SECURITY.md](SECURITY.md).
 
 ## Documentation
 
-- [Installation](docs/INSTALL.md)
-- [Development](docs/DEVELOPMENT.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Security](docs/SECURITY.md)
-- [Testing](docs/TESTING.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Changelog](docs/CHANGELOG.md)
+- [Installation](INSTALL.md)
+- [Development](DEVELOPMENT.md)
+- [Architecture](ARCHITECTURE.md)
+- [CLI and agent integration](CLI.md)
+- [Security](SECURITY.md)
+- [Testing](TESTING.md)
+- [Roadmap](ROADMAP.md)
+- [Changelog](CHANGELOG.md)
+- [Current enterprise follow-up](reviews/NEXT_SESSION_ENTERPRISE_REVIEW_2026-08-25.md)
+- [Historical reviews](archive/)
 
 ## License
 
-MIT
+[MIT](../LICENSE)

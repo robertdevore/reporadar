@@ -30,6 +30,9 @@ kujo --version
 
 # Start the server
 kujo run src/main.kujo serve 8080
+
+# Verify Git, SQLite schema, and registry access
+kujo run src/main.kujo doctor
 ```
 
 ## Configuration
