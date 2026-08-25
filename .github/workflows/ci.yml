@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Kujo ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-15]
+    env:
+      KUJO_VERSION: v1.0.1
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Install checksum-verified Kujo release
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${RUNNER_OS}-${RUNNER_ARCH}" in
+            Linux-X64) platform="linux-x64" ;;
+            macOS-ARM64) platform="macos-arm64" ;;
+            macOS-X64) platform="macos-x64" ;;
+            *) echo "Unsupported runner: ${RUNNER_OS}-${RUNNER_ARCH}" >&2; exit 1 ;;
+          esac
+          archive="kujo-${KUJO_VERSION}-${platform}.tar.gz"
+          base="https://github.com/kujolang/kujo/releases/download/${KUJO_VERSION}"
+          curl --fail --silent --show-error --location --output "${RUNNER_TEMP}/${archive}" "${base}/${archive}"
+          curl --fail --silent --show-error --location --output "${RUNNER_TEMP}/${archive}.sha256" "${base}/${archive}.sha256"
+          cd "${RUNNER_TEMP}"
+          shasum -a 256 --check "${archive}.sha256"
+          mkdir -p "${RUNNER_TEMP}/kujo-bin"
+          tar -xzf "${archive}" -C "${RUNNER_TEMP}/kujo-bin"
+          echo "${RUNNER_TEMP}/kujo-bin" >> "${GITHUB_PATH}"
+
+      - name: Check Kujo source
+        shell: bash
+        run: |
+          set -euo pipefail
+          for source in src/*.kujo; do kujo check "${source}"; done
+
+      - name: Run Kujo tests
+        run: kujo test --runtime dual
+
+      - name: Run CLI contract harness
+        run: python3 tests/cli_contract_harness.py
+
+      - name: Run server smoke harness
+        run: python3 tests/server_smoke_harness.py
+
+      - name: Check browser JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          for source in static/*.js; do node --check "${source}"; done
