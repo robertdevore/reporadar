@@ -4,12 +4,13 @@
 from src.server import start_server, discover_repos
 from src.scanner import scan_repo_with_options, collect_recent_commits
 from src.registry import add_repo, remove_repo, get_all_repos, get_repo_by_id, get_repo_stale_map, store_scan_result, store_repo_commits
-from src.db import init_db, init_db_with_options, get_setting
+from src.db import init_db, init_db_with_options, get_setting, get_db_path
 from src.health_report import build_review_report, report_exit_code
+from src.version import app_version
 
 /// print_usage displays the CLI contract for humans and automation.
 export func print_usage() {
-	print("RepoRadar v0.4.0 — Local Git Repository Dashboard")
+	print("RepoRadar v" + app_version() + " — Local Git Repository Dashboard")
 	print("")
 	print("Usage: kujo run src/main.kujo <command> [options]")
 	print("")
@@ -24,6 +25,8 @@ export func print_usage() {
 	print("  remove <repo-id>                Remove a repository from tracking")
 	print("  discover <path>                 Discover repositories under a directory")
 	print("  export                          Export the registry to JSON")
+	print("  doctor [--json]                Verify runtime, database, and registry health")
+	print("  version [--json]               Print the RepoRadar version")
 	print("  serve [port]                    Start the dashboard server (default: 8080)")
 	print("  help                            Show this help")
 	print("")
@@ -323,10 +326,83 @@ export func cmd_export() {
 	mut settings = {}
 	mut i = 0
 	while i < len(settings_rows) { settings[settings_rows[i]["key"]] = settings_rows[i]["value"]; i = i + 1 }
-	mut export_data = {"app": "reporadar", "version": "0.4.0", "exported_at": current_timestamp(db), "settings": settings, "repos": repos}
+	mut export_data = {"app": "reporadar", "version": app_version(), "exported_at": current_timestamp(db), "settings": settings, "repos": repos}
 	write_file("reporadar-export.json", to_json_pretty(export_data), {"overwrite": true})
 	print("Exported " + to_string(len(repos)) + " repos to reporadar-export.json")
 	return 0
+}
+
+/// cmd_version emits a stable human or machine-readable version result.
+export func cmd_version(argv) {
+	mut invalid = unknown_flag(argv, ["--json"])
+	mut json_mode = has_flag(argv, "--json")
+	if invalid != "" { emit_cli_error(json_mode, "unknown option: " + invalid, 2); return 2 }
+	if json_mode {
+		print(to_json_pretty({"success": true, "app": "reporadar", "version": app_version(), "exit_code": 0}))
+	} else {
+		print("RepoRadar v" + app_version())
+	}
+	return 0
+}
+
+/// cmd_doctor verifies the dependencies and state agents need before automation.
+export func cmd_doctor(argv) {
+	mut invalid = unknown_flag(argv, ["--json"])
+	mut json_mode = has_flag(argv, "--json")
+	if invalid != "" { emit_cli_error(json_mode, "unknown option: " + invalid, 2); return 2 }
+
+	mut git_result = execute_status("git --version")
+	mut git_ok = git_result.success && git_result.exitcode == 0
+	mut kujo_result = execute_status("kujo --version")
+	mut kujo_ok = kujo_result.success && kujo_result.exitcode == 0
+	mut report = {
+		"success": false,
+		"app": "reporadar",
+		"version": app_version(),
+		"database_path": get_db_path(),
+		"schema_version": 0,
+		"tracked_repositories": 0,
+		"kujo": {"ok": kujo_ok, "version": trim(kujo_result.stdout)},
+		"git": {"ok": git_ok, "version": trim(git_result.stdout)},
+		"database": {"ok": false},
+		"exit_code": 1
+	}
+
+	try {
+		mut db = init_db_with_options(json_mode == false)
+		mut version_rows = db_query(db, "SELECT MAX(version) as version FROM schema_version")
+		if len(version_rows) > 0 && version_rows[0]["version"] != null {
+			report["schema_version"] = to_int(version_rows[0]["version"])
+		}
+		mut repo_rows = db_query(db, "SELECT COUNT(*) as count FROM repos WHERE archived = 0")
+		if len(repo_rows) > 0 {
+			report["tracked_repositories"] = to_int(repo_rows[0]["count"])
+		}
+		report["database"] = {"ok": true}
+	} except err {
+		report["database"] = {"ok": false, "error": "Database initialization or query failed"}
+	}
+
+	report["success"] = kujo_ok && git_ok && report["database"]["ok"]
+	if report["success"] { report["exit_code"] = 0 }
+	if json_mode {
+		print(to_json_pretty(report))
+	} else {
+		mut kujo_status = "missing or unavailable"
+		if kujo_ok { kujo_status = "ok — " + report["kujo"]["version"] }
+		mut git_status = "missing or unavailable"
+		if git_ok { git_status = "ok — " + report["git"]["version"] }
+		mut database_status = "unavailable"
+		if report["database"]["ok"] { database_status = "ok — schema " + to_string(report["schema_version"]) }
+		print("")
+		print("=== RepoRadar Doctor ===")
+		print("Kujo: " + kujo_status)
+		print("Git: " + git_status)
+		print("Database: " + database_status)
+		print("Tracked repositories: " + to_string(report["tracked_repositories"]))
+		print("")
+	}
+	return report["exit_code"]
 }
 
 /// main routes commands and terminates with documented exit codes.
@@ -345,6 +421,8 @@ export func main() {
 	if cmd == "scan" { return cmd_scan(positional_arg(argv, 1, ""), argv) }
 	if cmd == "scan-all" { return cmd_scan_all(argv) }
 	if cmd == "review" { return cmd_review(argv) }
+	if cmd == "doctor" { return cmd_doctor(argv) }
+	if cmd == "version" || cmd == "--version" { return cmd_version(argv) }
 	if cmd == "add" {
 		mut path = positional_arg(argv, 1, "")
 		if path == "" { print("Error: path is required"); return 2 }

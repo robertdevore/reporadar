@@ -1,5 +1,7 @@
 // health_report.kujo — Agent-friendly repository health reporting helpers
 
+from src.version import app_version
+
 /// repo_number returns a nullable/missing repository field as an integer default.
 export func repo_number(repo, key, default_value) {
 	if has_key(repo, key) == 0 || repo[key] == null {
@@ -183,7 +185,7 @@ export func build_review_report(repos, stale_by_id, include_mode, generated_at) 
 	return {
 		"schema_version": 1,
 		"app": "reporadar",
-		"version": "0.4.0",
+		"version": app_version(),
 		"generated_at": generated_at,
 		"filter": include_mode,
 		"summary": summary,

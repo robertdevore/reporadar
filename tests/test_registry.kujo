@@ -1,8 +1,8 @@
 // RepoRadar Registry & Database Tests
 // Run: kujo test-run tests/test_registry.kujo
 
-from src.db import init_db, get_setting, set_setting, sanitize_setting_value
-from src.registry import add_repo, remove_repo, update_repo, get_all_repos, get_repo_by_id, get_repo_file_changes, store_repo_commits, trim_repo_history
+from src.db import init_db, get_setting, set_setting, sanitize_setting_value, create_schema_with_options, configure_connection
+from src.registry import add_repo, remove_repo, update_repo, normalize_binary_flag, get_all_repos, get_repo_by_id, get_repo_file_changes, store_repo_commits, trim_repo_history
 
 // === Database Tests ===
 
@@ -67,6 +67,28 @@ test_group "Database — init and settings" {
 
 // === Registry Tests ===
 
+test_group "Registry — input normalization" {
+	test "binary flags normalize untrusted dynamic values" {
+		assert_equal(normalize_binary_flag(1), 1)
+		assert_equal(normalize_binary_flag(true), 1)
+		assert_equal(normalize_binary_flag("true"), 1)
+		assert_equal(normalize_binary_flag("0, archived = 1 WHERE 1=1 --"), 0)
+	}
+
+	test "update_repo keeps SQL-shaped flags inert" {
+		let db = db_connect("sqlite", ":memory:")
+		db_execute(db, "CREATE TABLE repos (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_name TEXT, path TEXT NOT NULL UNIQUE, group_name TEXT DEFAULT '', tags TEXT DEFAULT '', notes TEXT DEFAULT '', pinned INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), last_scan_at TEXT, last_error TEXT)")
+		db_execute(db, "INSERT INTO repos (name, path) VALUES ('one', '/one')")
+		db_execute(db, "INSERT INTO repos (name, path) VALUES ('two', '/two')")
+		let result = update_repo(db, 1, null, null, null, null, "0, archived = 1 WHERE 1=1 --", null)
+		assert_true(result["success"])
+		let rows = db_query(db, "SELECT pinned, archived FROM repos ORDER BY id")
+		assert_equal(rows[0]["pinned"], 0)
+		assert_equal(rows[0]["archived"], 0)
+		assert_equal(rows[1]["archived"], 0)
+	}
+}
+
 test_group "Registry — add and query repos" {
 	test "add_repo validates invalid path" {
 		let db = db_connect("sqlite", ":memory:")
@@ -110,6 +132,20 @@ test_group "Registry — add and query repos" {
 		
 		let repo = get_repo_by_id(db, 999)
 		assert_equal(repo, null)
+	}
+}
+
+test_group "Database — hardening" {
+	test "schema version and indexes migrate to version two" {
+		let db = db_connect("sqlite", ":memory:")
+		configure_connection(db)
+		create_schema_with_options(db, false)
+		let versions = db_query(db, "SELECT MAX(version) as version FROM schema_version")
+		let indexes = db_query(db, "SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('idx_repo_status_snapshots_latest', 'idx_repo_commits_date_repo')")
+		let foreign_keys = db_query(db, "PRAGMA foreign_keys")
+		assert_equal(versions[0]["version"], 2)
+		assert_equal(len(indexes), 2)
+		assert_equal(foreign_keys[0]["foreign_keys"], 1)
 	}
 }
 

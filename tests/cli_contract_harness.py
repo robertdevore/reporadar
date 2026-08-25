@@ -49,6 +49,22 @@ def main() -> None:
         assert fresh_data["schema_version"] == 1
         assert fresh_data["summary"]["total"] == 0
 
+        version = run_cli(db_path, "version", "--json")
+        assert version.returncode == 0, version.stdout + version.stderr
+        version_data = json_result(version)
+        assert version_data["app"] == "reporadar"
+        assert version_data["version"] == "0.4.0"
+
+        doctor = run_cli(db_path, "doctor", "--json")
+        assert doctor.returncode == 0, doctor.stdout + doctor.stderr
+        doctor_data = json_result(doctor)
+        assert doctor_data["success"] is True
+        assert doctor_data["kujo"]["ok"] is True
+        assert doctor_data["git"]["ok"] is True
+        assert doctor_data["database"]["ok"] is True
+        assert doctor_data["schema_version"] == 2
+        assert doctor_data["tracked_repositories"] == 0
+
         repo.mkdir()
         git(repo, "init")
         git(repo, "config", "user.email", "cli-contract@example.invalid")

@@ -55,12 +55,21 @@ export func sanitize_setting_value(key, value) {
 export func create_indexes(db) {
 	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_repos_archived_pinned_name ON repos (archived, pinned DESC, name ASC)")
 	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_repo_status_snapshots_repo_scanned_at ON repo_status_snapshots (repo_id, scanned_at DESC)")
+	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_repo_status_snapshots_latest ON repo_status_snapshots (repo_id, scanned_at DESC, id DESC)")
 	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_repo_status_snapshots_dependabot ON repo_status_snapshots (dependabot_alert_count)")
 	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_repo_file_changes_snapshot_id ON repo_file_changes (snapshot_id)")
 	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_repo_commits_repo_date ON repo_commits (repo_id, date DESC)")
-	db_execute(db, "DELETE FROM repo_commits WHERE id NOT IN (SELECT MIN(id) FROM repo_commits GROUP BY repo_id, commit_hash)")
+	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_repo_commits_date_repo ON repo_commits (date DESC, repo_id)")
 	db_execute(db, "CREATE UNIQUE INDEX IF NOT EXISTS idx_repo_commits_repo_hash ON repo_commits (repo_id, commit_hash)")
 	db_execute(db, "CREATE INDEX IF NOT EXISTS idx_scan_runs_completed_at ON scan_runs (completed_at DESC)")
+}
+
+/// configure_connection enables integrity, concurrency, and durability defaults.
+export func configure_connection(db) {
+	db_query(db, "PRAGMA foreign_keys = ON")
+	db_query(db, "PRAGMA busy_timeout = 5000")
+	db_query(db, "PRAGMA journal_mode = WAL")
+	db_query(db, "PRAGMA synchronous = NORMAL")
 }
 
 /// init_db creates/opens the database and ensures the schema is up to date.
@@ -75,6 +84,7 @@ export func init_db_with_options(announce) {
 	mut db_exists = file_exists(db_path)
 
 	mut db = db_connect("sqlite", db_path)
+	configure_connection(db)
 
 	if !db_exists {
 		create_schema_with_options(db, announce)
@@ -108,6 +118,13 @@ export func migrate_schema(db) {
 	}
 	if !table_has_column(db, "repo_status_snapshots", "dependabot_checked_at") {
 		db_execute(db, "ALTER TABLE repo_status_snapshots ADD COLUMN dependabot_checked_at TEXT")
+	}
+}
+
+/// migrate_data_v2 performs one-time cleanup needed before unique indexes.
+export func migrate_data_v2(db, current_version) {
+	if current_version < 2 {
+		db_execute(db, "DELETE FROM repo_commits WHERE id NOT IN (SELECT MIN(id) FROM repo_commits GROUP BY repo_id, commit_hash)")
 	}
 }
 
@@ -145,7 +162,7 @@ export func create_schema_with_options(db, announce) {
 	create_indexes(db)
 
 	// Record schema version
-	db_execute(db, "INSERT INTO schema_version (version) VALUES (1)")
+	db_execute(db, "INSERT OR IGNORE INTO schema_version (version) VALUES (2)")
 
 	if announce {
 		print("Database initialized at: " + get_db_path())
@@ -154,6 +171,7 @@ export func create_schema_with_options(db, announce) {
 
 /// ensure_schema checks if the schema needs migration and applies it.
 export func ensure_schema(db) {
+	db_execute(db, "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))")
 	mut version_rows = db_query(db, "SELECT MAX(version) as version FROM schema_version")
 	mut current_version = 0
 	if len(version_rows) > 0 {
@@ -163,10 +181,6 @@ export func ensure_schema(db) {
 				current_version = to_int(row["version"])
 			}
 		}
-	}
-
-	if current_version < 1 {
-		db_execute(db, "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))")
 	}
 
 	// Ensure all tables exist (idempotent)
@@ -192,10 +206,11 @@ export func ensure_schema(db) {
 	db_execute(db, "INSERT OR IGNORE INTO settings (key, value) VALUES ('default_sort_order', 'asc')")
 
 	migrate_schema(db)
+	migrate_data_v2(db, current_version)
 	create_indexes(db)
 
-	if current_version < 1 {
-		db_execute(db, "INSERT INTO schema_version (version) VALUES (1)")
+	if current_version < 2 {
+		db_execute(db, "INSERT OR IGNORE INTO schema_version (version) VALUES (2)")
 	}
 }
 
