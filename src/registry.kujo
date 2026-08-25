@@ -108,6 +108,20 @@ export func get_all_repos(db) {
 	return db_query(db, query)
 }
 
+/// get_repo_stale_map returns latest-snapshot staleness keyed by repository ID.
+export func get_repo_stale_map(db, stale_days) {
+	mut days = stale_days
+	if days <= 0 { days = 14 }
+	mut rows = db_query(db, "SELECT r.id, CASE WHEN s.latest_commit_date IS NULL OR s.latest_commit_date = '' OR julianday('now') - julianday(s.latest_commit_date) > " + to_string(days) + " THEN 1 ELSE 0 END AS is_stale FROM repos r LEFT JOIN (SELECT repo_id, latest_commit_date, ROW_NUMBER() OVER (PARTITION BY repo_id ORDER BY scanned_at DESC) as rn FROM repo_status_snapshots) s ON r.id = s.repo_id AND s.rn = 1 WHERE r.archived = 0")
+	mut stale_by_id = {}
+	mut i = 0
+	while i < len(rows) {
+		stale_by_id[to_string(rows[i]["id"])] = rows[i]["is_stale"]
+		i = i + 1
+	}
+	return stale_by_id
+}
+
 /// get_repo_by_id returns a single repo with its latest status.
 export func get_repo_by_id(db, repo_id) {
 	mut query = "SELECT r.*, s.id as snapshot_id, s.branch, s.remote_url, s.upstream_branch, s.latest_commit_hash, s.latest_commit_short_hash, s.latest_commit_message, s.latest_commit_author, s.latest_commit_date, s.is_clean, s.staged_count, s.unstaged_count, s.untracked_count, s.changed_total, s.ahead_count, s.behind_count, s.is_diverged, s.is_detached, s.has_remote, s.dependabot_alert_count, s.dependabot_checked_at, s.scan_error, s.scanned_at FROM repos r LEFT JOIN (SELECT id, repo_id, branch, remote_url, upstream_branch, latest_commit_hash, latest_commit_short_hash, latest_commit_message, latest_commit_author, latest_commit_date, is_clean, staged_count, unstaged_count, untracked_count, changed_total, ahead_count, behind_count, is_diverged, is_detached, has_remote, dependabot_alert_count, dependabot_checked_at, scan_error, scanned_at, ROW_NUMBER() OVER (PARTITION BY repo_id ORDER BY scanned_at DESC) as rn FROM repo_status_snapshots) s ON r.id = s.repo_id AND s.rn = 1 WHERE r.id = " + to_string(repo_id)

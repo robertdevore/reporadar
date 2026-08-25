@@ -1,0 +1,204 @@
+// health_report.kujo — Agent-friendly repository health reporting helpers
+
+/// repo_number returns a nullable/missing repository field as an integer default.
+export func repo_number(repo, key, default_value) {
+	if has_key(repo, key) == 0 || repo[key] == null {
+		return default_value
+	}
+	return to_int(repo[key])
+}
+
+/// repo_text returns a nullable/missing repository field as a string default.
+export func repo_text(repo, key, default_value) {
+	if has_key(repo, key) == 0 || repo[key] == null || repo[key] == "" {
+		return default_value
+	}
+	return to_string(repo[key])
+}
+
+/// repo_status returns an exclusive machine-readable repository state.
+export func repo_status(repo) {
+	if has_key(repo, "scan_error") == 1 && repo["scan_error"] != null && repo["scan_error"] != "" {
+		return "error"
+	}
+	if has_key(repo, "is_clean") == 0 || repo["is_clean"] == null {
+		return "unscanned"
+	}
+	if repo_number(repo, "is_clean", 0) == 1 {
+		return "clean"
+	}
+	return "dirty"
+}
+
+/// repo_attention_reasons returns stable reason identifiers for automation.
+export func repo_attention_reasons(repo, is_stale) {
+	mut reasons = []
+	mut status = repo_status(repo)
+	if status == "error" {
+		return push(reasons, "scan_error")
+	}
+	if status == "unscanned" {
+		return push(reasons, "unscanned")
+	}
+	if status == "dirty" {
+		reasons = push(reasons, "dirty_worktree")
+	}
+	mut ahead = repo_number(repo, "ahead_count", 0)
+	mut behind = repo_number(repo, "behind_count", 0)
+	if ahead > 0 && behind > 0 {
+		reasons = push(reasons, "diverged")
+	} else {
+		if ahead > 0 {
+			reasons = push(reasons, "ahead")
+		}
+		if behind > 0 {
+			reasons = push(reasons, "behind")
+		}
+	}
+	if repo_number(repo, "has_remote", 0) == 0 {
+		reasons = push(reasons, "no_remote")
+	}
+	if is_stale == 1 {
+		reasons = push(reasons, "stale")
+	}
+	if repo_number(repo, "dependabot_alert_count", -1) > 0 {
+		reasons = push(reasons, "security_alerts")
+	}
+	return reasons
+}
+
+/// repo_priority converts attention reasons to a stable priority label.
+export func repo_priority(reasons) {
+	mut i = 0
+	while i < len(reasons) {
+		mut reason = reasons[i]
+		i = i + 1
+		if reason == "scan_error" || reason == "diverged" || reason == "security_alerts" {
+			return "critical"
+		}
+	}
+	i = 0
+	while i < len(reasons) {
+		mut reason = reasons[i]
+		i = i + 1
+		if reason == "dirty_worktree" || reason == "behind" || reason == "unscanned" {
+			return "high"
+		}
+	}
+	if len(reasons) > 0 {
+		return "medium"
+	}
+	return "none"
+}
+
+/// build_review_report builds a deterministic JSON-ready repository health report.
+/// include_mode accepts all, dirty, or attention.
+export func build_review_report(repos, stale_by_id, include_mode, generated_at) {
+	mut summary = {
+		"total": len(repos),
+		"included": 0,
+		"clean": 0,
+		"dirty": 0,
+		"errors": 0,
+		"unscanned": 0,
+		"attention": 0,
+		"ahead": 0,
+		"behind": 0,
+		"diverged": 0,
+		"no_remote": 0,
+		"stale": 0,
+		"security_alerts": 0,
+		"changed_files": 0
+	}
+	mut included_repos = []
+	mut i = 0
+	while i < len(repos) {
+		mut repo = repos[i]
+		i = i + 1
+		mut repo_id = to_string(repo["id"])
+		mut is_stale = 0
+		if has_key(stale_by_id, repo_id) == 1 {
+			is_stale = to_int(stale_by_id[repo_id])
+		}
+		mut status = repo_status(repo)
+		if status == "unscanned" { is_stale = 0 }
+		mut reasons = repo_attention_reasons(repo, is_stale)
+		mut attention = 0
+		if len(reasons) > 0 {
+			attention = 1
+			summary["attention"] = summary["attention"] + 1
+		}
+		if status == "clean" { summary["clean"] = summary["clean"] + 1 }
+		if status == "dirty" { summary["dirty"] = summary["dirty"] + 1 }
+		if status == "error" { summary["errors"] = summary["errors"] + 1 }
+		if status == "unscanned" { summary["unscanned"] = summary["unscanned"] + 1 }
+		mut ahead = repo_number(repo, "ahead_count", 0)
+		mut behind = repo_number(repo, "behind_count", 0)
+		if ahead > 0 { summary["ahead"] = summary["ahead"] + 1 }
+		if behind > 0 { summary["behind"] = summary["behind"] + 1 }
+		if ahead > 0 && behind > 0 { summary["diverged"] = summary["diverged"] + 1 }
+		if status != "unscanned" && repo_number(repo, "has_remote", 0) == 0 { summary["no_remote"] = summary["no_remote"] + 1 }
+		if status != "unscanned" && is_stale == 1 { summary["stale"] = summary["stale"] + 1 }
+		mut alert_count = repo_number(repo, "dependabot_alert_count", -1)
+		if alert_count > 0 { summary["security_alerts"] = summary["security_alerts"] + alert_count }
+		summary["changed_files"] = summary["changed_files"] + repo_number(repo, "changed_total", 0)
+
+		mut include_repo = include_mode == "all"
+		if include_mode == "dirty" && status == "dirty" { include_repo = true }
+		if include_mode == "attention" && attention == 1 { include_repo = true }
+		if include_repo {
+			mut item = {
+				"id": repo["id"],
+				"name": repo_text(repo, "display_name", repo_text(repo, "name", "?")),
+				"path": repo_text(repo, "path", ""),
+				"group": repo_text(repo, "group_name", ""),
+				"tags": repo_text(repo, "tags", ""),
+				"status": status,
+				"priority": repo_priority(reasons),
+				"attention": attention,
+				"attention_reasons": reasons,
+				"branch": repo_text(repo, "branch", ""),
+				"staged": repo_number(repo, "staged_count", 0),
+				"unstaged": repo_number(repo, "unstaged_count", 0),
+				"untracked": repo_number(repo, "untracked_count", 0),
+				"changed_total": repo_number(repo, "changed_total", 0),
+				"ahead": ahead,
+				"behind": behind,
+				"diverged": repo_number(repo, "is_diverged", 0),
+				"has_remote": repo_number(repo, "has_remote", 0),
+				"remote_url": repo_text(repo, "remote_url", ""),
+				"upstream_branch": repo_text(repo, "upstream_branch", ""),
+				"stale": is_stale,
+				"dependabot_alert_count": alert_count,
+				"latest_commit_hash": repo_text(repo, "latest_commit_hash", ""),
+				"latest_commit_message": repo_text(repo, "latest_commit_message", ""),
+				"latest_commit_date": repo_text(repo, "latest_commit_date", ""),
+				"scanned_at": repo_text(repo, "scanned_at", ""),
+				"scan_error": repo_text(repo, "scan_error", "")
+			}
+			included_repos = push(included_repos, item)
+		}
+	}
+	summary["included"] = len(included_repos)
+	return {
+		"schema_version": 1,
+		"app": "reporadar",
+		"version": "0.4.0",
+		"generated_at": generated_at,
+		"filter": include_mode,
+		"summary": summary,
+		"repos": included_repos
+	}
+}
+
+/// report_exit_code maps report health to automation-friendly exit codes.
+export func report_exit_code(report, fail_on_attention) {
+	mut summary = report["summary"]
+	if to_int(summary["errors"]) > 0 {
+		return 1
+	}
+	if fail_on_attention == 1 && to_int(summary["attention"]) > 0 {
+		return 3
+	}
+	return 0
+}

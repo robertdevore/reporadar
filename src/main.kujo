@@ -1,180 +1,318 @@
 // main.kujo — RepoRadar CLI Entry Point
-// Usage: kujo run src/main.kujo [command]
+// Usage: kujo run src/main.kujo [command] [options]
 
 from src.server import start_server, discover_repos
 from src.scanner import scan_repo_with_options, collect_recent_commits
-from src.registry import add_repo, remove_repo, get_all_repos, get_repo_by_id, store_scan_result, store_repo_commits
-from src.db import init_db, get_setting
+from src.registry import add_repo, remove_repo, get_all_repos, get_repo_by_id, get_repo_stale_map, store_scan_result, store_repo_commits
+from src.db import init_db, init_db_with_options, get_setting
+from src.health_report import build_review_report, report_exit_code
 
-/// print_usage displays the help text.
+/// print_usage displays the CLI contract for humans and automation.
 export func print_usage() {
 	print("RepoRadar v0.4.0 — Local Git Repository Dashboard")
 	print("")
-	print("Usage: kujo run src/main.kujo [command] [options]")
+	print("Usage: kujo run src/main.kujo <command> [options]")
 	print("")
-	print("Commands:")
-	print("  serve [port]        Start the dashboard server (default port: 8080)")
-	print("  scan <repo-id>      Scan a single tracked repo by ID")
-	print("  scan-all            Scan all tracked repos")
-	print("  add <path>          Add a repo by path")
-	print("  remove <repo-id>    Remove a repo from tracking")
-	print("  list                List all tracked repos")
-	print("  discover <path>     Discover Git repos under a directory")
-	print("  export              Export registry to JSON")
-	print("  help                Show this help")
+	print("Health commands:")
+	print("  list [filters]                  Show detailed latest repository health")
+	print("  scan <repo-id> [options]        Scan one tracked repository")
+	print("  scan-all [options]              Scan every repository and report results")
+	print("  review [options]                Report actionable repositories for agents")
+	print("")
+	print("Registry commands:")
+	print("  add <path>                      Add a repository")
+	print("  remove <repo-id>                Remove a repository from tracking")
+	print("  discover <path>                 Discover repositories under a directory")
+	print("  export                          Export the registry to JSON")
+	print("  serve [port]                    Start the dashboard server (default: 8080)")
+	print("  help                            Show this help")
+	print("")
+	print("Health options:")
+	print("  --json                          Emit JSON only (schema_version: 1)")
+	print("  --dirty-only                    Include only dirty working trees")
+	print("  --attention-only                Include only repositories needing attention")
+	print("  --fail-on-attention             Exit 3 when attention items exist")
+	print("  --scan                          Refresh all repositories before review")
+	print("  --all                           Include all repositories in review output")
+	print("  --no-fail-on-attention          Keep review exit 0 when only attention exists")
+	print("")
+	print("Exit codes:")
+	print("  0  Command completed successfully")
+	print("  1  Scan or operational error")
+	print("  2  Invalid command or arguments")
+	print("  3  Attention items found when attention failure is enabled")
 	print("")
 	print("Examples:")
-	print("  kujo run src/main.kujo serve 8080")
-	print("  kujo run src/main.kujo add /Users/me/my-project")
-	print("  kujo run src/main.kujo scan 1")
-	print("  kujo run src/main.kujo scan-all")
-	print("  kujo run src/main.kujo list")
+	print("  kujo run src/main.kujo scan-all --json")
+	print("  kujo run src/main.kujo list --dirty-only")
+	print("  kujo run src/main.kujo review --scan --json")
+	print("  kujo run src/main.kujo review --all --no-fail-on-attention")
 }
 
-/// cmd_list prints all tracked repos.
-export func cmd_list() {
-	mut db = init_db()
+/// has_flag checks whether an exact CLI flag is present.
+export func has_flag(argv, wanted) {
+	mut i = 0
+	while i < len(argv) {
+		if argv[i] == wanted { return true }
+		i = i + 1
+	}
+	return false
+}
+
+/// positional_arg returns the first non-flag argument from a position onward.
+export func positional_arg(argv, start_index, default_value) {
+	mut i = start_index
+	while i < len(argv) {
+		if starts_with(argv[i], "--") == false { return argv[i] }
+		i = i + 1
+	}
+	return default_value
+}
+
+/// unknown_flag returns the first unsupported option or an empty string.
+export func unknown_flag(argv, allowed) {
+	mut i = 1
+	while i < len(argv) {
+		mut token = argv[i]
+		if starts_with(token, "--") {
+			mut known = false
+			mut j = 0
+			while j < len(allowed) {
+				if token == allowed[j] { known = true }
+				j = j + 1
+			}
+			if known == false { return token }
+		}
+		i = i + 1
+	}
+	return ""
+}
+
+/// emit_cli_error keeps JSON command failures machine-parseable.
+export func emit_cli_error(json_mode, message, code) {
+	if json_mode {
+		print(to_json_pretty({"success": false, "error": message, "exit_code": code}))
+	} else {
+		print("Error: " + message)
+	}
+}
+
+/// current_timestamp returns a database-generated timestamp.
+export func current_timestamp(db) {
+	mut rows = db_query(db, "SELECT datetime('now') as generated_at")
+	if len(rows) > 0 && rows[0]["generated_at"] != null {
+		return rows[0]["generated_at"]
+	}
+	return ""
+}
+
+/// load_health_report reads latest snapshots and creates normalized output.
+export func load_health_report(db, include_mode) {
 	mut repos = get_all_repos(db)
+	mut stale_days = parse_int(get_setting(db, "stale_threshold_days", "14"))
+	mut stale_by_id = get_repo_stale_map(db, stale_days)
+	return build_review_report(repos, stale_by_id, include_mode, current_timestamp(db))
+}
+
+/// print_human_report renders a compact but actionable terminal view.
+export func print_human_report(report, title) {
+	mut summary = report["summary"]
 	print("")
-	print("=== Tracked Repositories (" + to_string(len(repos)) + ") ===")
+	print("=== " + title + " ===")
+	print("Total " + to_string(summary["total"]) + " | Clean " + to_string(summary["clean"]) + " | Dirty " + to_string(summary["dirty"]) + " | Errors " + to_string(summary["errors"]) + " | Unscanned " + to_string(summary["unscanned"]) + " | Attention " + to_string(summary["attention"]))
+	print("Changed files " + to_string(summary["changed_files"]) + " | Ahead " + to_string(summary["ahead"]) + " | Behind " + to_string(summary["behind"]) + " | Diverged " + to_string(summary["diverged"]) + " | Stale " + to_string(summary["stale"]) + " | Alerts " + to_string(summary["security_alerts"]))
 	print("")
+	mut repos = report["repos"]
+	if len(repos) == 0 {
+		print("No repositories matched this view.")
+		print("")
+		return
+	}
 	mut i = 0
 	while i < len(repos) {
 		mut repo = repos[i]
 		i = i + 1
-		mut status = "?"
-		if has_key(repo, "is_clean") == 1 {
-			if repo["is_clean"] == 1 { status = "Clean" } else { status = "Dirty" }
-		}
-		if has_key(repo, "scan_error") == 1 && repo["scan_error"] != null && repo["scan_error"] != "" {
-			status = "Error"
-		}
-		mut name = get_default(repo, "display_name", get_default(repo, "name", "?"))
-		print("  [" + to_string(repo["id"]) + "] " + name + " — " + status)
+		mut branch = repo["branch"]
+		if branch == "" { branch = "no branch" }
+		print("  [" + repo["status"] + "/" + repo["priority"] + "] " + repo["name"] + " — " + branch)
 		print("      " + repo["path"])
+		print("      Changes: " + to_string(repo["changed_total"]) + " (" + to_string(repo["staged"]) + " staged, " + to_string(repo["unstaged"]) + " unstaged, " + to_string(repo["untracked"]) + " untracked) | Sync: +" + to_string(repo["ahead"]) + "/-" + to_string(repo["behind"]))
+		if len(repo["attention_reasons"]) > 0 {
+			print("      Attention: " + join(repo["attention_reasons"], ", "))
+		}
+		if repo["scan_error"] != "" {
+			print("      Scan error: " + repo["scan_error"])
+		}
+		if repo["scanned_at"] != "" {
+			print("      Last scan: " + repo["scanned_at"])
+		}
 	}
 	print("")
 }
 
-/// cmd_add adds a repo by path.
-export func cmd_add(path) {
-	if path == "" {
-		print("Error: path is required")
-		return
-	}
-	mut db = init_db()
-	mut result = add_repo(db, path, "", "", "", "", 0)
-	if result["success"] {
-		print("Added repo: " + result["path"] + " (ID: " + to_string(result["id"]) + ")")
-	} else {
-		print("Error: " + result["error"])
-	}
-}
-
-/// cmd_remove removes a repo from tracking.
-export func cmd_remove(repo_id_str) {
-	if repo_id_str == "" {
-		print("Error: repo ID is required")
-		return
-	}
-	mut db = init_db()
-	mut repo_id = parse_int(repo_id_str)
-	mut result = remove_repo(db, repo_id)
-	if result["success"] {
-		print("Repo " + repo_id_str + " removed from tracking.")
-	} else {
-		print("Error: " + result["error"])
-	}
-}
-
-/// cmd_scan scans a single repo.
-export func cmd_scan(repo_id_str) {
-	if repo_id_str == "" {
-		print("Error: repo ID is required")
-		return
-	}
-	mut db = init_db()
-	mut repo_id = parse_int(repo_id_str)
-	mut repo = get_repo_by_id(db, repo_id)
-	if repo == null {
-		print("Error: repo not found")
-		return
-	}
-
-	print("Scanning: " + repo["path"] + " ...")
-	mut enable_dependabot_alerts = get_setting(db, "enable_dependabot_alerts", "false") == "true"
-	mut scan_result = scan_repo_with_options(repo["path"], enable_dependabot_alerts)
-	store_scan_result(db, repo_id, scan_result)
-
-	if scan_result["success"] {
-		print("Branch: " + scan_result["branch"])
-		if scan_result["is_clean"] == 1 {
-			print("Status: Clean")
-		} else {
-			print("Status: Dirty (" + to_string(scan_result["changed_total"]) + " changed files)")
-		}
-		if scan_result["has_remote"] == 1 {
-			print("Remote: " + scan_result["remote_url"])
-			print("Ahead: " + to_string(scan_result["ahead_count"]) + " | Behind: " + to_string(scan_result["behind_count"]))
-		}
-		if scan_result["latest_commit_message"] != "" {
-			print("Latest: " + scan_result["latest_commit_message"])
-		}
-	} else {
-		print("Error: " + scan_result["error"])
-	}
-}
-
-/// cmd_scan_all scans all tracked repos.
-export func cmd_scan_all() {
-	mut db = init_db()
+/// run_bulk_scan performs and records one complete CLI scan run.
+export func run_bulk_scan(db, quiet) {
 	mut repos = get_all_repos(db)
-	print("Scanning " + to_string(len(repos)) + " repos...")
-
-	mut success = 0
-	mut errors = 0
+	db_execute(db, "INSERT INTO scan_runs (repo_count) VALUES (" + to_string(len(repos)) + ")")
+	mut run_rows = db_query(db, "SELECT last_insert_rowid() as id")
+	mut run_id = to_int(run_rows[0]["id"])
+	mut result = {"performed": true, "run_id": run_id, "total": len(repos), "succeeded": 0, "errors": 0, "clean": 0, "dirty": 0, "repo_results": []}
+	if quiet == false { print("Scanning " + to_string(len(repos)) + " repos...") }
+	mut enable_dependabot_alerts = get_setting(db, "enable_dependabot_alerts", "false") == "true"
 	mut i = 0
 	while i < len(repos) {
 		mut repo = repos[i]
 		i = i + 1
-		print("  [" + to_string(i) + "/" + to_string(len(repos)) + "] " + repo["name"] + " ...")
-		mut enable_dependabot_alerts = get_setting(db, "enable_dependabot_alerts", "false") == "true"
+		mut name = get_default(repo, "display_name", get_default(repo, "name", "?"))
+		if quiet == false { print("  [" + to_string(i) + "/" + to_string(len(repos)) + "] " + name + " ...") }
 		mut scan_result = scan_repo_with_options(repo["path"], enable_dependabot_alerts)
 		store_scan_result(db, repo["id"], scan_result)
-
 		if scan_result["success"] {
-			success = success + 1
+			result["succeeded"] = result["succeeded"] + 1
+			if scan_result["is_clean"] == 1 { result["clean"] = result["clean"] + 1 } else { result["dirty"] = result["dirty"] + 1 }
 			mut commits = collect_recent_commits(repo["path"], 0)
 			store_repo_commits(db, repo["id"], commits)
 		} else {
-			errors = errors + 1
-			print("    Error: " + scan_result["error"])
+			result["errors"] = result["errors"] + 1
+			if quiet == false { print("    Error: " + scan_result["error"]) }
 		}
+		result["repo_results"] = push(result["repo_results"], {"repo_id": repo["id"], "name": name, "success": scan_result["success"], "error": scan_result["error"]})
 	}
-
-	print("")
-	print("Done. " + to_string(success) + " succeeded, " + to_string(errors) + " errors.")
+	db_execute(db, "UPDATE scan_runs SET completed_at = datetime('now'), success_count = " + to_string(result["succeeded"]) + ", error_count = " + to_string(result["errors"]) + ", clean_count = " + to_string(result["clean"]) + ", dirty_count = " + to_string(result["dirty"]) + " WHERE id = " + to_string(run_id))
+	return result
 }
 
-/// cmd_discover finds Git repos under a parent directory.
-export func cmd_discover(parent_path) {
-	if parent_path == "" {
-		print("Error: parent path is required")
-		return
+/// cmd_list reports the latest stored repository state.
+export func cmd_list(argv) {
+	mut invalid = unknown_flag(argv, ["--json", "--dirty-only", "--attention-only"])
+	mut json_mode = has_flag(argv, "--json")
+	if invalid != "" { emit_cli_error(json_mode, "unknown option: " + invalid, 2); return 2 }
+	mut include_mode = "all"
+	if has_flag(argv, "--attention-only") { include_mode = "attention" }
+	if has_flag(argv, "--dirty-only") { include_mode = "dirty" }
+	mut db = init_db_with_options(json_mode == false)
+	mut report = load_health_report(db, include_mode)
+	report["command"] = "list"
+	report["success"] = true
+	report["exit_code"] = 0
+	if json_mode { print(to_json_pretty(report)) } else { print_human_report(report, "Repository Health") }
+	return 0
+}
+
+/// cmd_scan scans a single repository and returns its normalized status.
+export func cmd_scan(repo_id_str, argv) {
+	mut invalid = unknown_flag(argv, ["--json", "--fail-on-attention"])
+	mut json_mode = has_flag(argv, "--json")
+	if invalid != "" { emit_cli_error(json_mode, "unknown option: " + invalid, 2); return 2 }
+	mut repo_id = parse_int(repo_id_str)
+	if repo_id <= 0 { emit_cli_error(json_mode, "repo ID must be a positive number", 2); return 2 }
+	mut db = init_db_with_options(json_mode == false)
+	mut repo = get_repo_by_id(db, repo_id)
+	if repo == null { emit_cli_error(json_mode, "repo not found", 1); return 1 }
+	if json_mode == false { print("Scanning: " + repo["path"] + " ...") }
+	mut enable_dependabot_alerts = get_setting(db, "enable_dependabot_alerts", "false") == "true"
+	mut scan_result = scan_repo_with_options(repo["path"], enable_dependabot_alerts)
+	store_scan_result(db, repo_id, scan_result)
+	if scan_result["success"] {
+		mut commits = collect_recent_commits(repo["path"], 0)
+		store_repo_commits(db, repo_id, commits)
 	}
+	mut fresh_repo = get_repo_by_id(db, repo_id)
+	mut stale_map = get_repo_stale_map(db, parse_int(get_setting(db, "stale_threshold_days", "14")))
+	mut report = build_review_report([fresh_repo], stale_map, "all", current_timestamp(db))
+	report["command"] = "scan"
+	report["scan"] = {"performed": true, "repo_id": repo_id, "success": scan_result["success"], "error": scan_result["error"]}
+	mut exit_code = 0
+	if scan_result["success"] == false {
+		exit_code = 1
+	} else {
+		mut fail_on_attention = 0
+		if has_flag(argv, "--fail-on-attention") { fail_on_attention = 1 }
+		exit_code = report_exit_code(report, fail_on_attention)
+	}
+	report["success"] = scan_result["success"]
+	report["exit_code"] = exit_code
+	if json_mode { print(to_json_pretty(report)) } else { print_human_report(report, "Repository Scan") }
+	return exit_code
+}
+
+/// cmd_scan_all scans all repositories and emits a complete health report.
+export func cmd_scan_all(argv) {
+	mut invalid = unknown_flag(argv, ["--json", "--dirty-only", "--attention-only", "--fail-on-attention"])
+	mut json_mode = has_flag(argv, "--json")
+	if invalid != "" { emit_cli_error(json_mode, "unknown option: " + invalid, 2); return 2 }
+	mut include_mode = "all"
+	if has_flag(argv, "--attention-only") { include_mode = "attention" }
+	if has_flag(argv, "--dirty-only") { include_mode = "dirty" }
+	mut db = init_db_with_options(json_mode == false)
+	mut scan_info = run_bulk_scan(db, json_mode)
+	mut report = load_health_report(db, include_mode)
+	report["command"] = "scan-all"
+	report["scan"] = scan_info
+	mut fail_on_attention = 0
+	if has_flag(argv, "--fail-on-attention") { fail_on_attention = 1 }
+	mut exit_code = report_exit_code(report, fail_on_attention)
+	if scan_info["errors"] > 0 { exit_code = 1 }
+	report["success"] = scan_info["errors"] == 0
+	report["exit_code"] = exit_code
+	if json_mode { print(to_json_pretty(report)) } else { print_human_report(report, "Bulk Scan Results") }
+	return exit_code
+}
+
+/// cmd_review provides the opinionated agent review surface.
+export func cmd_review(argv) {
+	mut invalid = unknown_flag(argv, ["--json", "--dirty-only", "--attention-only", "--scan", "--all", "--fail-on-attention", "--no-fail-on-attention"])
+	mut json_mode = has_flag(argv, "--json")
+	if invalid != "" { emit_cli_error(json_mode, "unknown option: " + invalid, 2); return 2 }
+	mut include_mode = "attention"
+	if has_flag(argv, "--all") { include_mode = "all" }
+	if has_flag(argv, "--dirty-only") { include_mode = "dirty" }
+	mut db = init_db_with_options(json_mode == false)
+	mut scan_info = {"performed": false, "run_id": 0, "total": 0, "succeeded": 0, "errors": 0, "clean": 0, "dirty": 0, "repo_results": []}
+	if has_flag(argv, "--scan") { scan_info = run_bulk_scan(db, json_mode) }
+	mut report = load_health_report(db, include_mode)
+	report["command"] = "review"
+	report["scan"] = scan_info
+	mut fail_on_attention = 1
+	if has_flag(argv, "--no-fail-on-attention") { fail_on_attention = 0 }
+	mut exit_code = report_exit_code(report, fail_on_attention)
+	if scan_info["errors"] > 0 { exit_code = 1 }
+	report["success"] = scan_info["errors"] == 0 && report["summary"]["errors"] == 0
+	report["exit_code"] = exit_code
+	if json_mode { print(to_json_pretty(report)) } else { print_human_report(report, "Ecosystem Review") }
+	return exit_code
+}
+
+/// cmd_add adds a repository by path.
+export func cmd_add(path) {
+	mut db = init_db()
+	mut result = add_repo(db, path, "", "", "", "", 0)
+	if result["success"] { print("Added repo: " + result["path"] + " (ID: " + to_string(result["id"]) + ")"); return 0 }
+	print("Error: " + result["error"])
+	return 1
+}
+
+/// cmd_remove removes a repository from tracking.
+export func cmd_remove(repo_id_str) {
+	mut db = init_db()
+	mut result = remove_repo(db, parse_int(repo_id_str))
+	if result["success"] { print("Repo " + repo_id_str + " removed from tracking."); return 0 }
+	print("Error: " + result["error"])
+	return 1
+}
+
+/// cmd_discover finds Git repositories under a parent directory.
+export func cmd_discover(parent_path) {
 	mut db = init_db()
 	mut ignored_str = get_setting(db, "ignored_folders", "node_modules,vendor,.cache,dist,build,.git")
-	mut ignored_folders = split(ignored_str, ",")
-	mut discovered = discover_repos(parent_path, 3, 0, ignored_folders)
+	mut discovered = discover_repos(parent_path, 3, 0, split(ignored_str, ","))
 	print("")
 	print("=== Discovered " + to_string(len(discovered)) + " Git repos under " + parent_path + " ===")
 	print("")
-	mut di = 0
-	while di < len(discovered) {
-		print("  " + discovered[di]["name"] + " — " + discovered[di]["path"])
-		di = di + 1
-	}
+	mut i = 0
+	while i < len(discovered) { print("  " + discovered[i]["name"] + " — " + discovered[i]["path"]); i = i + 1 }
 	print("")
+	return 0
 }
 
 /// cmd_export exports the registry to JSON.
@@ -184,105 +322,48 @@ export func cmd_export() {
 	mut settings_rows = db_query(db, "SELECT key, value FROM settings")
 	mut settings = {}
 	mut i = 0
-	while i < len(settings_rows) {
-		settings[settings_rows[i]["key"]] = settings_rows[i]["value"]
-		i = i + 1
-	}
-
-	mut exported_rows = db_query(db, "SELECT datetime('now') as exported_at")
-	mut exported_at = ""
-	if len(exported_rows) > 0 {
-		exported_at = exported_rows[0]["exported_at"]
-	}
-
-	mut export_data = {
-		"app": "reporadar",
-		"version": "0.4.0",
-		"exported_at": exported_at,
-		"settings": settings,
-		"repos": repos
-	}
-
-	mut json_str = to_json_pretty(export_data)
-	write_file("reporadar-export.json", json_str, {"overwrite": true})
+	while i < len(settings_rows) { settings[settings_rows[i]["key"]] = settings_rows[i]["value"]; i = i + 1 }
+	mut export_data = {"app": "reporadar", "version": "0.4.0", "exported_at": current_timestamp(db), "settings": settings, "repos": repos}
+	write_file("reporadar-export.json", to_json_pretty(export_data), {"overwrite": true})
 	print("Exported " + to_string(len(repos)) + " repos to reporadar-export.json")
+	return 0
 }
 
-/// main is the CLI entry point.
+/// main routes commands and terminates with documented exit codes.
 export func main() {
 	mut argv = args()
 	mut cmd = "serve"
-	mut cmd_arg = "8080"
-
-	if len(argv) > 0 {
-		cmd = argv[0]
-	}
-	if len(argv) > 1 {
-		cmd_arg = argv[1]
-	}
-
-	if cmd == "help" || cmd == "--help" || cmd == "-h" {
-		print_usage()
-		return
-	}
-
+	if len(argv) > 0 { cmd = argv[0] }
+	if cmd == "help" || cmd == "--help" || cmd == "-h" { print_usage(); return 0 }
 	if cmd == "serve" {
-		mut port = parse_int(cmd_arg)
-		if port <= 0 || port > 65535 {
-			print("Error: port must be between 1 and 65535")
-			return
-		}
+		mut port = parse_int(positional_arg(argv, 1, "8080"))
+		if port <= 0 || port > 65535 { print("Error: port must be between 1 and 65535"); return 2 }
 		start_server(port)
-		return
+		return 0
 	}
-
-	if cmd == "list" {
-		cmd_list()
-		return
-	}
-
+	if cmd == "list" { return cmd_list(argv) }
+	if cmd == "scan" { return cmd_scan(positional_arg(argv, 1, ""), argv) }
+	if cmd == "scan-all" { return cmd_scan_all(argv) }
+	if cmd == "review" { return cmd_review(argv) }
 	if cmd == "add" {
-		cmd_add(cmd_arg)
-		return
+		mut path = positional_arg(argv, 1, "")
+		if path == "" { print("Error: path is required"); return 2 }
+		return cmd_add(path)
 	}
-
 	if cmd == "remove" {
-		if parse_int(cmd_arg) <= 0 {
-			print("Error: repo ID must be a positive number")
-			return
-		}
-		cmd_remove(cmd_arg)
-		return
+		mut repo_id = positional_arg(argv, 1, "")
+		if parse_int(repo_id) <= 0 { print("Error: repo ID must be a positive number"); return 2 }
+		return cmd_remove(repo_id)
 	}
-
-	if cmd == "scan" {
-		if parse_int(cmd_arg) <= 0 {
-			print("Error: repo ID must be a positive number")
-			return
-		}
-		cmd_scan(cmd_arg)
-		return
-	}
-
-	if cmd == "scan-all" {
-		cmd_scan_all()
-		return
-	}
-
 	if cmd == "discover" {
-		cmd_discover(cmd_arg)
-		return
+		mut path = positional_arg(argv, 1, "")
+		if path == "" { print("Error: parent path is required"); return 2 }
+		return cmd_discover(path)
 	}
-
-	if cmd == "export" {
-		cmd_export()
-		return
-	}
-
-	// Unknown command
-	print("Unknown command: " + cmd)
+	if cmd == "export" { return cmd_export() }
+	print("Error: unknown command: " + cmd)
 	print_usage()
+	return 2
 }
 
-// Run main
-main()
+exit(main())
