@@ -12,6 +12,9 @@ kujo test
 
 # Run with verbose output
 kujo test -v
+
+# Verify JSON purity, filters, scan behavior, and exit codes
+python3 tests/cli_contract_harness.py
 ```
 
 ## Test Categories
@@ -68,5 +71,6 @@ test "parse_git_status clean repo" {
 
 - Scanner unit tests, registry CRUD tests, and integration tests already live in `tests/`.
 - Regression coverage now includes escaped setting values, opt-in boolean setting normalization, shell-quoted paths, local `.git` marker validation, latest-snapshot file changes, bounded scan-history trimming, duplicate commit handling, GitHub remote parsing, and Dependabot alert count parsing.
+- Agent CLI coverage includes normalized report classification, stable attention reasons, dirty/attention filtering, JSON-only stdout, fresh scans, and exit codes `0` through `3`.
 - This pass also smoke-verified localhost CORS reflection and defensive browser headers against a running server.
 - The next useful step is to grow edge-case coverage and wire the suites into CI.

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### FEATURE
+- Agent-oriented `review` command with optional fresh bulk scans
+- JSON output for list, single-scan, bulk-scan, and review workflows
+- Dirty-only and attention-only repository filters
+- Normalized attention reasons and priority levels for automated triage
+
+### TWEAK
+- Detailed human-readable repository health output
+- Stable automation exit codes for operational errors, invalid usage, and attention findings
+- CLI bulk scans now persist scan-run summaries like the HTTP bulk-scan endpoint
+
 ## [0.4.0] — 2026-08-25
 
 ### FEATURE

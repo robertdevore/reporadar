@@ -20,6 +20,7 @@ Current release: **v0.4.0**
 - Optionally shows GitHub Dependabot alert counts when explicitly enabled and authenticated through `gh`
 - Serves dashboard, detail, activity, discovery, and settings views
 - Stores everything locally in SQLite with no telemetry or cloud dependency
+- Provides agent-friendly JSON health reports, attention filters, and automation exit codes
 
 ## Requirements
 
@@ -52,6 +53,9 @@ kujo run src/main.kujo scan 1
 
 # Scan all tracked repositories
 kujo run src/main.kujo scan-all
+
+# Run an agent-oriented ecosystem review with a fresh scan
+kujo run src/main.kujo review --scan --json
 
 # Discover Git repositories under a parent directory
 kujo run src/main.kujo discover /path/to/parent
@@ -116,6 +120,7 @@ kujo test
 - [Testing](docs/TESTING.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Changelog](docs/CHANGELOG.md)
+- [CLI and agent integration](docs/CLI.md)
 
 ## Troubleshooting
 

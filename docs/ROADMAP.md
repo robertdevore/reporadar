@@ -1,5 +1,12 @@
 # Roadmap
 
+## Unreleased
+- [x] Agent-oriented ecosystem review command
+- [x] Machine-readable JSON health reports
+- [x] Dirty and attention filters
+- [x] Automation-friendly exit codes
+- [x] Richer terminal health summaries
+
 ## v0.2.0
 - [x] Repo registry (add, edit, remove)
 - [x] Git scanner (status, branch, commit, remote)

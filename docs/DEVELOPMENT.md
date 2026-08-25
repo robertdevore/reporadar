@@ -44,7 +44,10 @@ kujo run src/main.kujo add /path/to/repo
 kujo run src/main.kujo list
 kujo run src/main.kujo scan <id>
 kujo run src/main.kujo scan-all
+kujo run src/main.kujo review --scan --json
 ```
+
+See [CLI and Agent Integration](CLI.md) for the JSON schema, filters, and exit-code contract.
 
 ## Kujo Conventions
 

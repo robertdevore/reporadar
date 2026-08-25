@@ -17,6 +17,7 @@ A local Git command center that shows at-a-glance visibility across all your loc
 - **Discovery** — Find repos under parent directories
 - **Bulk Scanning** — Scan all tracked repos at once
 - **Export/Import** — Portable JSON registry format
+- **Agent CLI** — Structured health reports, filters, priorities, and automation exit codes
 - **Settings** — Configurable thresholds and defaults
 
 ## Quick Start
@@ -32,6 +33,7 @@ kujo run src/main.kujo serve 8080
 kujo run src/main.kujo add /path/to/your/repo
 kujo run src/main.kujo scan 1
 kujo run src/main.kujo list
+kujo run src/main.kujo review --scan --json
 ```
 
 Open `http://127.0.0.1:8080` in your browser.
