@@ -135,6 +135,21 @@ test_group "Registry — update repo metadata" {
 }
 
 test_group "Registry — scan data helpers" {
+	test "latest snapshot wins when scans share a timestamp" {
+		let db = db_connect("sqlite", ":memory:")
+		db_execute(db, "CREATE TABLE repos (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_name TEXT, path TEXT NOT NULL UNIQUE, group_name TEXT DEFAULT '', tags TEXT DEFAULT '', notes TEXT DEFAULT '', pinned INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), last_scan_at TEXT, last_error TEXT)")
+		db_execute(db, "CREATE TABLE repo_status_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL, scanned_at TEXT NOT NULL, branch TEXT, remote_url TEXT, upstream_branch TEXT, latest_commit_hash TEXT, latest_commit_short_hash TEXT, latest_commit_message TEXT, latest_commit_author TEXT, latest_commit_date TEXT, is_clean INTEGER DEFAULT 0, staged_count INTEGER DEFAULT 0, unstaged_count INTEGER DEFAULT 0, untracked_count INTEGER DEFAULT 0, changed_total INTEGER DEFAULT 0, ahead_count INTEGER DEFAULT 0, behind_count INTEGER DEFAULT 0, is_diverged INTEGER DEFAULT 0, is_detached INTEGER DEFAULT 0, has_remote INTEGER DEFAULT 0, dependabot_alert_count INTEGER DEFAULT -1, dependabot_checked_at TEXT, scan_error TEXT)")
+		db_execute(db, "INSERT INTO repos (name, path) VALUES ('repo', '/fake/path')")
+		db_execute(db, "INSERT INTO repo_status_snapshots (repo_id, scanned_at, is_clean, changed_total) VALUES (1, '2026-08-25 12:00:00', 1, 0)")
+		db_execute(db, "INSERT INTO repo_status_snapshots (repo_id, scanned_at, is_clean, changed_total) VALUES (1, '2026-08-25 12:00:00', 0, 3)")
+
+		let repos = get_all_repos(db)
+		let repo = get_repo_by_id(db, 1)
+		assert_equal(repos[0]["is_clean"], 0)
+		assert_equal(repos[0]["changed_total"], 3)
+		assert_equal(repo["snapshot_id"], 2)
+	}
+
 	test "get_repo_file_changes returns latest snapshot only" {
 		let db = db_connect("sqlite", ":memory:")
 		db_execute(db, "CREATE TABLE repos (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, display_name TEXT, path TEXT NOT NULL UNIQUE, group_name TEXT DEFAULT '', tags TEXT DEFAULT '', notes TEXT DEFAULT '', pinned INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), last_scan_at TEXT, last_error TEXT)")

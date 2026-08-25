@@ -67,7 +67,8 @@ def main() -> None:
         assert scan_data["scan"]["clean"] == 1
         assert scan_data["summary"]["clean"] == 1
 
-        (repo / "README.md").write_text("# fixture\n\ndirty\n", encoding="utf-8")
+        # An untracked file keeps the dirty-state assertion independent of Git's stat cache.
+        (repo / "DIRTY.txt").write_text("dirty\n", encoding="utf-8")
         reviewed = run_cli(db_path, "review", "--scan", "--json")
         assert reviewed.returncode == 3, reviewed.stdout + reviewed.stderr
         review_data = json_result(reviewed)

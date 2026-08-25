@@ -377,7 +377,7 @@ export func api_dashboard_summary(req) {
 		summary["last_full_scan"] = scan_rows[0]["last_scan"]
 	}
 
-	mut stale_rows = db_query(db, "SELECT COUNT(*) as stale_count FROM repos r LEFT JOIN (SELECT repo_id, latest_commit_date, ROW_NUMBER() OVER (PARTITION BY repo_id ORDER BY scanned_at DESC) as rn FROM repo_status_snapshots) s ON r.id = s.repo_id AND s.rn = 1 WHERE r.archived = 0 AND (s.latest_commit_date IS NULL OR s.latest_commit_date = '' OR julianday('now') - julianday(s.latest_commit_date) > " + to_string(stale_days) + ")")
+	mut stale_rows = db_query(db, "SELECT COUNT(*) as stale_count FROM repos r LEFT JOIN (SELECT repo_id, latest_commit_date, ROW_NUMBER() OVER (PARTITION BY repo_id ORDER BY scanned_at DESC, id DESC) as rn FROM repo_status_snapshots) s ON r.id = s.repo_id AND s.rn = 1 WHERE r.archived = 0 AND (s.latest_commit_date IS NULL OR s.latest_commit_date = '' OR julianday('now') - julianday(s.latest_commit_date) > " + to_string(stale_days) + ")")
 	if len(stale_rows) > 0 && stale_rows[0]["stale_count"] != null {
 		summary["stale"] = stale_rows[0]["stale_count"]
 	}
