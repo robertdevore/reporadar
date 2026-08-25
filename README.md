@@ -2,6 +2,8 @@
 
 RepoRadar is a local-first Git repository dashboard built in the Kujo programming language. It gives teams and solo developers a fast, polished view of local repositories while keeping default operation on the local machine.
 
+Current release: **v0.4.0**
+
 ## Why it exists
 
 - Give one place to inspect the state of every local repo

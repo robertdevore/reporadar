@@ -781,7 +781,7 @@ export func api_export(req) {
 
 	mut export_data = {
 		"app": "reporadar",
-		"version": "0.3.0",
+		"version": "0.4.0",
 		"exported_at": "",
 		"settings": settings,
 		"repos": repos
@@ -1019,7 +1019,7 @@ export func setup_routes(server) {
 /// start_server initializes the database, sets up routes, and starts the HTTP server.
 export func start_server(port) {
 	print("")
-	print("=== RepoRadar v0.3.0 ===")
+	print("=== RepoRadar v0.4.0 ===")
 	print("")
 
 	mut db = init_db()

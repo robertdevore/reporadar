@@ -105,7 +105,7 @@ RepoRadar exists to provide one place to inspect local repository state, keep Gi
 
 ## What Is Confirmed
 
-- RepoRadar package metadata names the package `reporadar` at version `0.3.0`. Source: [S6].
+- RepoRadar package metadata names the package `reporadar` at version `0.4.0`. Source: [S6].
 - RepoRadar requires Kujo v1.0.0+, Git on `PATH`, and a Unix-like environment according to docs. Sources: [S1], [S13].
 - The CLI command surface includes `serve`, `scan`, `scan-all`, `add`, `remove`, `list`, `discover`, `export`, and `help`. Sources: [S1], [S7].
 - The server binds to `127.0.0.1` and registers static plus API routes. Sources: [S4], [S10].
@@ -190,7 +190,7 @@ RepoRadar exists to provide one place to inspect local repository state, keep Gi
 - [S6] Path: `kujo.toml`
   Type: metadata.
   Detail: package name/version.
-  Supports: package identity `reporadar` version `0.3.0`.
+  Supports: package identity `reporadar` version `0.4.0`.
   Evidence status: confirmed.
 - [S7] Path: `src/main.kujo`
   Type: source.

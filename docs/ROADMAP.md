@@ -12,7 +12,7 @@
 - [x] JSON export/import
 - [x] Database backup/restore
 
-## v0.3.0 (Current checkpoint)
+## v0.3.0
 - [x] Dashboard column controls
 - [x] Decorative summary charts
 - [x] Refined dashboard table controls and action icons
@@ -22,9 +22,9 @@
 - [x] Commit hash and remote detail presentation refinements
 - [x] Sharper visual system with square-edged UI
 
-## v0.4.0 (Planned)
+## v0.4.0 (Current checkpoint)
 - [ ] Write action endpoints (stage, commit, push, pull)
-- [ ] Confirmation modal for write actions
+- [x] Styled confirmation modal for repository removal
 - [ ] Audit log for write actions
 - [ ] Comprehensive test suite
 - [ ] Real-time scan progress via polling

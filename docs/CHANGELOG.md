@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.0] — 2026-08-25
+
+### FEATURE
+- Styled repository removal confirmation modal
+- Footer links to the RepoRadar GitHub repository and Robert DeVore's website
+
+### TWEAK
+- Rebuilt the bulk scan modal layout for a compact, consistent presentation
+- Updated application and frontend version displays
+
 ## [0.3.0] — 2026-07-20
 
 ### FEATURE
