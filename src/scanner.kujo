@@ -112,6 +112,10 @@ export func parse_git_status(output) {
 			mut header = substring(line, 3, len(line))
 
 			// Check for initial commit state
+			if starts_with(header, "No commits yet on ") {
+				result["branch"] = replace_str(header, "No commits yet on ", "")
+				continue
+			}
 			if contains(header, "Initial commit on ") == 1 {
 				mut branch = replace_str(header, "Initial commit on ", "")
 				result["branch"] = branch
@@ -184,24 +188,6 @@ export func parse_git_status(output) {
 		if len(line) >= 3 {
 			mut status_code = substring(line, 0, 2)
 			mut filename = trim(substring(line, 3, len(line)))
-
-			// Handle rename (first line may show old -> new)
-			if starts_with(status_code, "R") {
-				// Renamed file
-				result["unstaged_count"] = result["unstaged_count"] + 1
-				result["changed_total"] = result["changed_total"] + 1
-				result["is_clean"] = 0
-				mut change = {
-					"status_code": status_code,
-					"file_path": filename,
-					"status_label": "renamed",
-					"staged": 0,
-					"unstaged": 1,
-					"untracked": 0
-				}
-				result["file_changes"] = push(result["file_changes"], change)
-				continue
-			}
 
 			// Parse index and worktree status
 			mut index_status = char_at(status_code, 0)
@@ -508,7 +494,7 @@ export func scan_repo_with_options(repo_path, enable_dependabot_alerts) {
 	result["file_changes"] = status_data["file_changes"]
 
 	// Check for detached HEAD
-	if result["branch"] == "" || starts_with(result["branch"], "HEAD detached") {
+	if result["branch"] == "" || starts_with(result["branch"], "HEAD detached") || result["branch"] == "HEAD (no branch)" {
 		result["is_detached"] = 1
 		// Try to get branch info via rev-parse
 		mut head_result = execute_status(git_inspect_prefix(repo_path) + " rev-parse --abbrev-ref HEAD 2>/dev/null")

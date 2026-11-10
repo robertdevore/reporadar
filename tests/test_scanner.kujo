@@ -240,3 +240,20 @@ test_group "commit log parsing" {
 		assert_equal(commit["message"], "fix parser --- keep suffix")
 	}
 }
+
+// Rename columns must retain independent index/worktree state.
+test_group "rename and unborn branch regressions" {
+    test "staged rename" {
+        mut result = parse_git_status("## main\nR  old -> new")
+        assert_equal(result["staged_count"], 1)
+        assert_equal(result["unstaged_count"], 0)
+    }
+    test "staged rename with worktree edits" {
+        mut result = parse_git_status("## main\nRM old -> new")
+        assert_equal(result["staged_count"], 1)
+        assert_equal(result["unstaged_count"], 1)
+    }
+    test "unborn branch uses its actual name" {
+        assert_equal(parse_git_status("## No commits yet on main")["branch"], "main")
+    }
+}
