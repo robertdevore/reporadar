@@ -54,7 +54,7 @@ def wait_until_ready(port: int) -> None:
     raise RuntimeError("RepoRadar server did not become ready")
 
 
-def main() -> None:
+def check_runtime(interpreter: bool) -> None:
     with tempfile.TemporaryDirectory(prefix="reporadar-server-smoke-") as temp_dir:
         temp = Path(temp_dir)
         repo = temp / "fixture"
@@ -65,7 +65,8 @@ def main() -> None:
         env = os.environ.copy()
         env["REPORADAR_DB"] = str(temp / "reporadar.db")
         process = subprocess.Popen(
-            ["kujo", "run", "src/main.kujo", "serve", str(port)],
+            ["kujo", "run", *(["--interpreter"] if interpreter else []),
+             "src/main.kujo", "serve", str(port)],
             cwd=ROOT,
             env=env,
             stdout=subprocess.PIPE,
@@ -74,6 +75,17 @@ def main() -> None:
         )
         try:
             wait_until_ready(port)
+
+            # Static and API callbacks must retain their imported module scope.
+            for path in ("/", "/detail.html", "/activity.html", "/discovery.html",
+                         "/settings.html", "/style.css", "/app.js", "/detail.js",
+                         "/activity.js", "/discovery.js", "/settings.js"):
+                with urlopen(f"http://127.0.0.1:{port}{path}", timeout=5) as response:
+                    assert response.status == 200, path
+                    assert response.read(), path
+            for path in ("/api/settings", "/api/dashboard/summary", "/api/activity"):
+                status, payload, _ = request(port, path)
+                assert status == 200 and payload["success"] is True, (path, payload)
 
             status, payload, headers = request(port, "/api/repos")
             assert status == 200 and payload["success"] is True
@@ -109,7 +121,11 @@ def main() -> None:
                 process.kill()
                 process.wait(timeout=5)
 
-    print("RepoRadar server smoke harness passed")
+
+def main() -> None:
+    for interpreter in (False, True):
+        check_runtime(interpreter)
+    print("RepoRadar server smoke harness passed (VM and interpreter)")
 
 
 if __name__ == "__main__":
