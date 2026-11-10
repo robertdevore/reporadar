@@ -1,0 +1,118 @@
+{
+  "platform": "macOS-26.6.2-x86_64-i386-64bit",
+  "runtime": "kujo 1.9.0",
+  "rename": {
+    "staged_count": 1,
+    "unstaged_count": 0,
+    "file_changes": [
+      {
+        "file_path": "old -> new",
+        "staged": 1,
+        "status_code": "R ",
+        "status_label": "renamed",
+        "unstaged": 0,
+        "untracked": 0
+      }
+    ]
+  },
+  "detached": {
+    "branch": "(detached at c821fe1)",
+    "is_detached": 1
+  },
+  "discovery": {
+    "budget_after": {
+      "entries_remaining": 100,
+      "results_remaining": 1
+    },
+    "count": 1
+  },
+  "partial_scan": {
+    "changes": [
+      {
+        "n": 0
+      }
+    ],
+    "failed": true,
+    "snapshots": [
+      {
+        "n": 0
+      }
+    ]
+  },
+  "rejected_import": {
+    "status": 413,
+    "body": "{\"error\":\"Settings limit is 50 keys\",\"success\":false}",
+    "repos_after": 0
+  },
+  "malformed_json": {
+    "status": 400,
+    "body": "{\"error\":\"Invalid JSON\",\"success\":false}"
+  },
+  "host_validation": {
+    "status": 403,
+    "body": "{\"error\":\"Invalid localhost authority\",\"success\":false}"
+  },
+  "backup": {
+    "status": 200,
+    "bytes": 90112,
+    "integrity": "ok",
+    "marker": [
+      [
+        "latest"
+      ]
+    ]
+  },
+  "health_after_backup": {
+    "status": 200
+  },
+  "benchmarks": [
+    {
+      "repos": 30,
+      "snapshots": 7500,
+      "http_ms": [
+        5.22,
+        4.49,
+        3.93
+      ],
+      "median_ms": 4.49,
+      "http_bytes": 22150,
+      "cli_json_bytes": 22844,
+      "http_status": 200,
+      "http_error": null,
+      "cli_exit": 0,
+      "cli_error": ""
+    },
+    {
+      "repos": 100,
+      "snapshots": 25000,
+      "http_ms": [
+        8.14,
+        7.7,
+        7.13
+      ],
+      "median_ms": 7.7,
+      "http_bytes": 73814,
+      "cli_json_bytes": 75072,
+      "http_status": 200,
+      "http_error": null,
+      "cli_exit": 0,
+      "cli_error": ""
+    },
+    {
+      "repos": 500,
+      "snapshots": 125000,
+      "http_ms": [
+        27.56,
+        26.19,
+        25.35
+      ],
+      "median_ms": 26.19,
+      "http_bytes": 370214,
+      "cli_json_bytes": 374672,
+      "http_status": 200,
+      "http_error": null,
+      "cli_exit": 0,
+      "cli_error": ""
+    }
+  ]
+}

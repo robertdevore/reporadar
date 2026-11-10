@@ -43,7 +43,7 @@ kujo run src/main.kujo scan 12 --json --fail-on-attention
 
 ## Runtime discovery
 
-Use `doctor` as a non-mutating preflight for human operators, scripts, and agents:
+Use `doctor` as an initializing preflight for human operators, scripts, and agents. It opens the configured database, creates or migrates its schema when necessary, and configures WAL. It does not scan Git repositories. For isolated checks, set `REPORADAR_DB` to a disposable path:
 
 ```bash
 kujo run src/main.kujo doctor
@@ -113,3 +113,14 @@ Run `doctor --json` before a scheduled review when the automation should disting
 ## Suggested agent instruction
 
 > Run RepoRadar `review --scan --json`. Summarize critical findings first, followed by high and medium priority repositories. Identify dirty worktrees, scan errors, divergence, branches behind or ahead of upstream, missing remotes, stale activity, and security alerts. Include repository paths. Do not modify repositories.
+
+## Bounded output and discovery
+
+Health commands (`list`, `scan`, `scan-all`, `review`) accept `--summary` to emit JSON with the normal summary, `summary_only: true`, and an empty `repos` array. Summary counts and exit policy still describe the complete selected report. `--output=<path>` writes the report JSON to that file and emits a small JSON receipt containing `output`, `success`, and `exit_code`. Combine them to save a summary. File-write failures exit 1; an empty output path exits 2. Existing default and `--json` output remain unchanged.
+
+```bash
+kujo run src/main.kujo list --summary
+kujo run src/main.kujo review --all --output=/tmp/reporadar-review.json
+```
+
+Discovery examines at most 25,000 directory entries across the traversal and returns at most 1,000 repositories. Pages are bounded before allocation; directory rescans for pagination consume the same global budget. A directory too large for the remaining budget returns incomplete results with a warning. The CLI prints that warning; the API returns `truncated` and `entries_examined`, which the discovery page displays. Narrow the parent directory when truncated. Git worktree `.git` files are recognized, child symlinks are skipped, and the filesystem root itself is not a supported discovery parent.

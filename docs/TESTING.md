@@ -20,6 +20,8 @@ python3 tests/cli_contract_harness.py
 
 # Exercise a live localhost server and its mutation boundary
 python3 tests/server_smoke_harness.py
+python3 tests/hardening_harness.py
+node tests/frontend_harness.js
 
 # Check frontend syntax
 for source in static/*.js; do node --check "$source"; done

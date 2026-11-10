@@ -37,7 +37,7 @@ reporadar/
 
 ```bash
 # Check all source files
-kujo check src/*.kujo
+for source in src/*.kujo; do kujo check "$source"; done
 
 # Start the server (foreground)
 kujo run src/main.kujo serve 8080

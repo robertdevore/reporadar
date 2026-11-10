@@ -80,3 +80,13 @@ RepoRadar has no user authentication because it is a single-user localhost appli
 ## Reporting Issues
 
 If you discover a security issue, please report it responsibly. Do not disclose publicly until resolved.
+
+## Request validation, imports, and backups
+
+Every registered route validates Host against `127.0.0.1`, `localhost`, or `[::1]`, optionally followed by a valid numeric port. Browser mutations also require matching Origin; originless local CLI clients remain supported. This closes the arbitrary-Host boundary without asserting a demonstrated browser DNS-rebinding exploit.
+
+JSON mutations reject malformed JSON and wrong container/field types with structured 400 responses. Collection limits return 413 before registry writes. Imports validate the entire structure before starting a transaction; unexpected persistence failures roll back repositories and settings together. Existing duplicate and missing-path skip behavior remains. Scan snapshots, file changes, timestamps, and retention pruning likewise commit atomically.
+
+`GET /api/export/db` uses SQLite `VACUUM INTO` to create a consistent snapshot including committed WAL data. The snapshot lives in a private temporary directory, is returned as binary SQLite data, and is removed after reading. A failed backup is logged and returns a structured error. Backups contain local paths and metadata; store them accordingly.
+
+The JSON importer accepts registry/settings exports, not SQLite files. To restore a binary backup, stop RepoRadar and any other users of its database, preserve the existing database together with its `-wal` and `-shm` sidecars, then place the downloaded file at the configured `REPORADAR_DB` path without old sidecars. Restart RepoRadar and run `doctor --json`. Do not replace a live database. The regression harness verifies backup integrity and recovery of a committed WAL marker using disposable files.

@@ -1,5 +1,8 @@
 # RepoRadar hardening review — 2026-11-09
 
+> **Fix-mode update, 2026-11-09:** R01–R10 below are resolved by the implementation and regression gates documented in the final section. The original review and baseline artifacts are preserved as historical evidence.
+
+
 ## Repository and boundary
 
 - Mode: **review**, the default for a bare kujo-hardening invocation. No implementation fixes were authorized by this invocation or made in this pass.
@@ -105,3 +108,58 @@ git diff --check
 ```
 
 Baseline checks PASS. Probe execution PASS as evidence collection; defective outcomes are OPEN findings, not passing product assertions. Dependency alert query returned 0, point-in-time only. Whitespace check PASS. No implementation changed, so there is no new behavioral regression or after-performance measurement to claim. Report-only CI is checked separately after push. Audit findings remain unresolved by design.
+
+## Fix-mode verification — 2026-11-09
+
+Scope: all ten confirmed findings from the review at `14be708901517c77cbaffa8cf0685b65e0240056`, using checksum-verified Kujo 1.9.0. The earlier phases 0–16 and exclusions above remain the review baseline; this pass completes implementation and verification phases 17–18. No other repositories were modified.
+
+| Finding | Resolution | Regression evidence |
+|---|---|---|
+| R01 | SQLite `VACUUM INTO` in a private temporary directory, binary HTTP body, cleanup on success/failure | Download signature, restored `integrity_check`, committed WAL marker, no leftover snapshot directory; VM and interpreter |
+| R02 | Validate all import collections/fields/settings before writes; transaction around repositories and settings | 51-key rejection leaves zero rows; injected settings trigger rolls back earlier repository insert; valid/duplicate imports preserved |
+| R03 | Iterative traversal with explicit global counters; bounded native directory pages; worktree markers; symlink skipping; CLI/API/UI incomplete-result notices | Result budget 1 returns 1; three-entry budget stays bounded; sibling/worktree/cycle fixtures; complete scan returns four repositories |
+| R04 | Parse index/worktree rename columns independently; recognize detached and unborn headers | Real Git staged rename and detached checkout in both runtimes; `RM` and unborn unit cases |
+| R05 | Snapshot, file changes, timestamps and pruning in one immediate transaction; Git inspection stays outside | Injected file-change failure leaves no snapshot or timestamp update |
+| R06 | Central route boundary parses once and checks object/array/field types; diagnostic logging for unexpected failures | Malformed JSON and wrong types across mutation endpoints return structured 400; subsequent reads remain healthy |
+| R07 | Loopback authority allowlist on every registered route, independent of Origin | Arbitrary Host with matching Origin rejected for reads/writes; IPv4/IPv6/localhost aliases accepted; missing/invalid ports rejected |
+| R08 | Saved stale/activity windows, exclusive status categories, summed alerts, inclusive ahead/behind, correct unscanned states | Browser-code tests for summary/filter/settings behavior; API summary and legacy timestamp tests |
+| R09 | Indexed correlated latest-snapshot lookups; SQL LIMIT 50 activity feed plus aggregate count; schema-version fast path; settings upsert; optional health summary/file output | Index query-plan assertion without temporary sort; 75 commits counted with only 50 returned; output equivalence and write-error checks; comparable measurements below |
+| R10 | Correct doctor/check/backup/discovery documentation; gate behavioral regressions in Linux/macOS CI | Source checks, existing contracts, new harnesses and frontend checks listed below |
+
+### Verification commands and results
+
+All local commands passed with the dedicated Kujo 1.9.0 binary first on PATH:
+
+```bash
+for source in src/*.kujo; do kujo check "$source"; done
+kujo test --runtime dual
+python3 tests/cli_contract_harness.py
+python3 tests/server_smoke_harness.py
+python3 tests/hardening_harness.py
+node tests/frontend_harness.js
+for source in static/*.js; do node --check "$source"; done
+git diff --check
+KUJO_BIN=/path/to/kujo-1.9.0/kujo python3 docs/audits/evidence/2026-11-09/probe.py
+```
+
+Kujo's `dual` strategy reports four fixture files passed with VM primary and no fallback; the server and hardening harnesses explicitly execute both VM and interpreter. Fixtures use disposable databases and repositories; the live registry is not modified by these tests. GitHub API checks on this date returned latest Kujo release `v1.9.0` and zero open RepoRadar Dependabot alerts. Existing dependency-free Kujo manifest and pinned CI actions are retained.
+
+### Comparable measurements
+
+Same preserved probe, macOS host, native Kujo 1.9.0, three sequential requests per scale, 250 snapshots per repository. Wall time is an observation, not a CI threshold. No memory, p95, token, or throughput claim is made. Detailed after evidence: [results](evidence/2026-11-09-fix/results.json).
+
+| Repositories / snapshots | Before median ms | After median ms | HTTP bytes before / after | CLI JSON bytes before / after |
+|---|---:|---:|---:|---:|
+| 30 / 7500 | 24.99 | 4.49 | 22150 / 22150 | 22844 / 22844 |
+| 100 / 25000 | 100.74 | 7.7 | 73814 / 73814 | 75072 / 75072 |
+| 500 / 125000 | 420.51 | 26.19 | 370214 / 370214 | 374672 / 374672 |
+
+Optional `--summary` produces less output in the regression fixture while preserving summary values and exit policy. `--output=<path>` preserves full report evidence and prints a small receipt. Default output remains unchanged.
+
+### Compatibility and limits
+
+No schema-version or default CLI schema bump is needed. JSON clients now receive 400 for malformed structures and 413 for oversized collections before import writes; unexpected failures remain logged 500 responses. Original missing-path/duplicate import skip semantics are retained. API discovery adds `truncated` and `entries_examined`; array-returning internal compatibility wrappers remain, but callers needing completeness should use `discover_report`. Child symlinks are excluded and filesystem-root discovery is rejected; select a narrower directory. Pagination rescans consume the same global entry budget, so wide directories can report incomplete results before returning all matches.
+
+Raw database restoration is an offline operation; the web importer remains JSON registry/settings import. The backup response necessarily materializes a binary snapshot in memory with the current HTTP runtime contract. This pass does not claim streaming or unlimited database scale.
+
+The prior browser-rebinding exploit hypothesis, malicious Git metadata investigation, sustained concurrent-load behavior, Windows-native support, external command timeouts, and enterprise controls were not converted into new confirmed findings. No unresolved item remains among R01–R10. Historical SignalBox review captures are referenced in the Strata completion handoff; no duplicate resolution captures are created.

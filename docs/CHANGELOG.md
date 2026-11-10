@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — hardening fixes
+
+- Resolve R01–R10 from the November 9 audit: consistent binary backups, atomic imports/scans, bounded discovery with visible truncation, rename/detached correctness, typed JSON and loopback Host validation.
+- Align dashboard settings, status categories and alert totals; bound activity feeds and use indexed latest-snapshot lookups.
+- Add health `--summary` and `--output=<path>` options, dual-runtime regression gates, frontend behavior tests, and corrected operational documentation.
+
+
 ## Unreleased
 
 ### FEATURE

@@ -105,6 +105,8 @@ Run the full suite from the project root:
 kujo test --runtime dual
 python3 tests/cli_contract_harness.py
 python3 tests/server_smoke_harness.py
+python3 tests/hardening_harness.py
+node tests/frontend_harness.js
 
 # Static checks
 for source in src/*.kujo; do kujo check "$source"; done
