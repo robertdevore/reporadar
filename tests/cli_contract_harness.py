@@ -62,7 +62,7 @@ def main() -> None:
         assert doctor_data["kujo"]["ok"] is True
         assert doctor_data["git"]["ok"] is True
         assert doctor_data["database"]["ok"] is True
-        assert doctor_data["schema_version"] == 2
+        assert doctor_data["schema_version"] == 3
         assert doctor_data["tracked_repositories"] == 0
 
         repo.mkdir()

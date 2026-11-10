@@ -46,3 +46,32 @@ vm.runInContext('loadActivity = days => record(days)', activity);
   assert.equal(buttons[1].classList.active, true);
   console.log('Frontend health and settings regressions passed');
 })().catch(err => {console.error(err); process.exitCode=1;});
+
+// Discovery controls update the visible results only after a successful save.
+(async () => {
+  const elements = new Map();
+  const element = id => {
+    if (!elements.has(id)) elements.set(id, {innerHTML:'',textContent:'',style:{},disabled:false});
+    return elements.get(id);
+  };
+  const saved = new Set();
+  const discovery = vm.createContext({
+    document: {addEventListener(){}, getElementById:element},
+    fetch: async (url, options) => {
+      const {action, paths} = JSON.parse(options.body);
+      paths.forEach(path => action === 'exclude' ? saved.add(path) : saved.delete(path));
+      return {ok:true,json:async () => ({excluded:[...saved].map(path => ({path}))})};
+    }
+  });
+  vm.runInContext(fs.readFileSync('static/discovery.js','utf8'), discovery);
+  vm.runInContext("showToast = () => {}; lastDiscoveryData = {new_repos:[{name:'Example',path:'/tmp/example'}], already_tracked:2, excluded_count:0}; renderDiscovery();", discovery);
+  assert.match(element('result-list').innerHTML, /data-exclude="0"/);
+  await vm.runInContext("updateExclusions('exclude',['/tmp/example'])", discovery);
+  assert.equal(saved.size,1);
+  assert.equal(element('btn-add-selected').style.display,'none');
+  assert.match(element('excluded-list').innerHTML,/Restore/);
+  await vm.runInContext("updateExclusions('restore',['/tmp/example'])", discovery);
+  assert.equal(saved.size,0);
+  assert.match(element('excluded-list').innerHTML,/No hidden/);
+  console.log('Discovery hide and restore frontend regressions passed');
+})().catch(err => { console.error(err); process.exitCode=1; });

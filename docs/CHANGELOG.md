@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — discovery controls
+
+- Keep detail-page Rescan, Copy Path, and Copy Status buttons inside their card with compact wrapping controls.
+- Persist hidden discovery results; hide one or selected repositories and restore them from the Hidden repositories list.
+- Prevent archived tracked repositories from reappearing as new discoveries. Migrate existing databases to schema v3 without changing tracked repositories.
+
+
 ## Unreleased — hardening fixes
 
 - Resolve R01–R10 from the November 9 audit: consistent binary backups, atomic imports/scans, bounded discovery with visible truncation, rename/detached correctness, typed JSON and loopback Host validation.

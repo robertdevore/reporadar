@@ -84,3 +84,7 @@ See [CLI and Agent Integration](CLI.md) for the JSON schema, filters, and exit-c
 - `GET /api/export/db` — Download database backup
 
 Mutation endpoints enforce exact same-origin browser requests, JSON media types where applicable, a 1 MiB request-body limit, and bounded collection sizes. Origin-less local clients remain supported for CLI and agent tooling.
+
+## Discovery exclusions
+
+`GET /api/discovery/exclusions` lists hidden paths. `PUT` accepts `{ "action": "exclude" | "restore", "paths": ["/absolute/path"] }`, up to 1,000 paths per request. Updates are atomic and enforce the standard localhost/JSON mutation policy. Schema v3 adds `discovery_exclusions`; existing registries migrate automatically. Hidden paths are persisted separately from tracked/archived repositories and never delete files. Full SQLite backups include them; registry-only JSON exports do not. Discovery counts distinguish new, already tracked (including archived), and hidden results.

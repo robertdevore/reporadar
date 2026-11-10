@@ -68,6 +68,11 @@ print(to_json({"failed":failed,"snapshots":db_query(db,"SELECT COUNT(*) AS n FRO
         bounded = discover(3, 100)
         assert bounded['truncated'] and bounded['entries_examined'] <= 3, bounded
         assert cli('doctor', '--json').returncode == 0
+        # Simulate an established v2 registry: startup migrates without losing settings.
+        with sqlite3.connect(temp / 'test.db') as migration:
+            migration.execute('DROP TABLE discovery_exclusions')
+            migration.execute('DELETE FROM schema_version WHERE version=3')
+            migration.execute('INSERT OR IGNORE INTO schema_version(version) VALUES (2)')
         port = free_port()
         def request(path, method='GET', payload=None, raw=None, headers=None):
             hdr = {'Content-Type': 'application/json'}
@@ -82,6 +87,27 @@ print(to_json({"failed":failed,"snapshots":db_query(db,"SELECT COUNT(*) AS n FRO
                                        env=env, stdout=log, stderr=log)
             try:
                 wait_until_ready(port)
+                discovery_payload = {'path':str(tree), 'max_depth':3}
+                assert len(json.loads(request('/api/discover', 'POST', discovery_payload)[1])['new_repos']) == 4
+                hidden = [str(tree / 'a'), str(tree / 'b')]
+                status, body = request('/api/discovery/exclusions', 'PUT', {'action':'exclude','paths':hidden})
+                assert status == 200 and len(json.loads(body)['excluded']) == 2, (status, body)
+                assert request('/api/discovery/exclusions', 'PUT', {'action':'exclude','paths':hidden})[0] == 200
+                assert request('/api/discovery/exclusions', 'PUT', {'action':'exclude','paths':[None]})[0] == 400
+                for _ in range(2):
+                    found = json.loads(request('/api/discover', 'POST', discovery_payload)[1])
+                    assert len(found['new_repos']) == 2 and found['excluded_count'] == 2, found
+                # Persistence is verified across a new server process, not just another request.
+                process.kill(); process.wait(timeout=5)
+                process = subprocess.Popen(prefix + ['src/main.kujo', 'serve', str(port)], cwd=ROOT,
+                                           env=env, stdout=log, stderr=log)
+                wait_until_ready(port)
+                assert len(json.loads(request('/api/discovery/exclusions')[1])['excluded']) == 2
+                assert request('/api/discovery/exclusions', 'PUT', {'action':'restore','paths':hidden})[0] == 200
+                assert len(json.loads(request('/api/discover', 'POST', discovery_payload)[1])['new_repos']) == 4
+                missing = str(temp / 'missing')
+                assert request('/api/discovery/exclusions', 'PUT', {'action':'exclude','paths':[missing]})[0] == 200
+                assert request('/api/discovery/exclusions', 'PUT', {'action':'restore','paths':[missing]})[0] == 200
                 malformed = [('/api/repos', 'POST', '{'), ('/api/repos', 'POST', '[]'),
                              ('/api/repos', 'POST', '{"path":42}'),
                              ('/api/repos/1', 'PUT', '{"notes":{}}'),
@@ -112,6 +138,10 @@ print(to_json({"failed":failed,"snapshots":db_query(db,"SELECT COUNT(*) AS n FRO
                 assert request('/api/import', 'POST', payload)[0] == 200
                 assert request('/api/import', 'POST', payload)[0] == 200  # duplicate remains a skip
                 assert conn.execute('SELECT count(*) FROM repos').fetchone()[0] == 1
+                conn.execute('UPDATE repos SET archived=1'); conn.commit()
+                found = json.loads(request('/api/discover', 'POST', {'path':str(repo)})[1])
+                assert found['already_tracked'] == 1 and not found['new_repos'], found
+                conn.execute('UPDATE repos SET archived=0'); conn.commit()
                 conn.execute('PRAGMA wal_autocheckpoint=0')
                 conn.execute("INSERT INTO settings VALUES ('wal_marker','latest')"); conn.commit()
                 status, binary = request('/api/export/db')

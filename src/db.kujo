@@ -161,8 +161,10 @@ export func create_schema_with_options(db, announce) {
 	migrate_schema(db)
 	create_indexes(db)
 
+	db_execute(db, "CREATE TABLE IF NOT EXISTS discovery_exclusions (path TEXT PRIMARY KEY, excluded_at TEXT NOT NULL DEFAULT (datetime('now'))) ")
+
 	// Record schema version
-	db_execute(db, "INSERT OR IGNORE INTO schema_version (version) VALUES (2)")
+	db_execute(db, "INSERT OR IGNORE INTO schema_version (version) VALUES (3)")
 
 	if announce {
 		print("Database initialized at: " + get_db_path())
@@ -176,8 +178,8 @@ export func ensure_schema(db) {
 	if len(tables) > 0 {
 		mut versions = db_query(db, "SELECT MAX(version) as version FROM schema_version")
 		if versions[0]["version"] != null {
-			if to_int(versions[0]["version"]) == 2 { return }
-			if to_int(versions[0]["version"]) > 2 { throw("Unsupported database schema version") }
+			if to_int(versions[0]["version"]) == 3 { return }
+			if to_int(versions[0]["version"]) > 3 { throw("Unsupported database schema version") }
 		}
 	}
 	db_execute(db, "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))")
@@ -218,8 +220,10 @@ export func ensure_schema(db) {
 	migrate_data_v2(db, current_version)
 	create_indexes(db)
 
-	if current_version < 2 {
-		db_execute(db, "INSERT OR IGNORE INTO schema_version (version) VALUES (2)")
+	db_execute(db, "CREATE TABLE IF NOT EXISTS discovery_exclusions (path TEXT PRIMARY KEY, excluded_at TEXT NOT NULL DEFAULT (datetime('now'))) ")
+
+	if current_version < 3 {
+		db_execute(db, "INSERT OR IGNORE INTO schema_version (version) VALUES (3)")
 	}
 }
 

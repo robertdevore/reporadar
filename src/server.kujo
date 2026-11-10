@@ -650,6 +650,43 @@ export func api_bulk_scan(req) {
 	return add_cors(json_response(200, results), req)
 }
 
+/// Exclusions are independent of the registry: hiding never removes tracked repos or files.
+export func api_discovery_exclusions(req) {
+	mut db = init_db()
+	if req["method"] == "PUT" {
+		mut data = req["data"]
+		mut paths = get(data, "paths")
+		mut action = get(data, "action")
+		if !is_array(paths) || (action != "exclude" && action != "restore") {
+			return add_cors(json_response(400, {"success":false,"error":"Provide paths and action exclude or restore"}), req)
+		}
+		if len(paths) > 1000 { return add_cors(json_response(413, {"success":false,"error":"Limit is 1000 paths"}), req) }
+		mut normalized = []
+		mut i = 0
+		while i < len(paths) {
+			mut path = paths[i]
+			i = i + 1
+			if !is_string(path) { return add_cors(json_response(400, {"success":false,"error":"Paths must be strings"}), req) }
+			if !starts_with(path, "/") || len(path) > 4096 { return add_cors(json_response(400, {"success":false,"error":"Provide an absolute repository path"}), req) }
+			// Restore uses the saved key even when the directory no longer exists.
+			if file_exists(path) { path = path_absolute(path) }
+			normalized = push(normalized, path)
+		}
+		db_begin_immediate(db)
+		try {
+			i = 0
+			while i < len(normalized) {
+				mut safe = escape_sql(normalized[i])
+				i = i + 1
+				if action == "exclude" { db_execute(db, "INSERT OR IGNORE INTO discovery_exclusions(path) VALUES ('" + safe + "')") }
+				else { db_execute(db, "DELETE FROM discovery_exclusions WHERE path = '" + safe + "'") }
+			}
+			db_commit(db)
+		} except err { db_rollback(db); throw(err) }
+	}
+	return add_cors(json_response(200, {"success":true,"excluded":db_query(db,"SELECT path, excluded_at FROM discovery_exclusions ORDER BY path")}), req)
+}
+
 /// api_discover searches for Git repos under a parent directory.
 export func api_discover(req) {
 	if req["method"] == "OPTIONS" {
@@ -689,8 +726,8 @@ export func api_discover(req) {
 	mut discovery = discover_report(parent_path, max_depth, include_hidden, ignored_folders, {"entries_remaining":25000,"results_remaining":1000})
 	mut discovered = discovery["repos"]
 
-	// Filter out already-tracked repos
-	mut tracked = get_all_repos(db)
+	// Archived repositories are still tracked and must not reappear as new.
+	mut tracked = db_query(db, "SELECT path FROM repos")
 	mut tracked_paths = {}
 	mut ti = 0
 	while ti < len(tracked) {
@@ -698,14 +735,20 @@ export func api_discover(req) {
 		ti = ti + 1
 	}
 
+	mut exclusions = db_query(db, "SELECT path FROM discovery_exclusions")
+	mut excluded_paths = {}
+	mut ei = 0
+	while ei < len(exclusions) { excluded_paths[exclusions[ei]["path"]] = 1; ei = ei + 1 }
+	mut excluded_count = 0
+	mut tracked_count = 0
 	mut new_repos = []
 	mut di = 0
 	while di < len(discovered) {
 		mut d = discovered[di]
 		di = di + 1
-		if has_key(tracked_paths, d["path"]) == 0 {
-			new_repos = push(new_repos, d)
-		}
+		if has_key(tracked_paths, d["path"]) == 1 { tracked_count = tracked_count + 1 }
+		else if has_key(excluded_paths, d["path"]) == 1 { excluded_count = excluded_count + 1 }
+		else { new_repos = push(new_repos, d) }
 	}
 
 	return add_cors(json_response(200, {
@@ -715,7 +758,8 @@ export func api_discover(req) {
 		"entries_examined": discovery["entries_examined"],
 		"total_found": len(discovered),
 		"new_repos": new_repos,
-		"already_tracked": len(discovered) - len(new_repos)
+		"already_tracked": tracked_count,
+		"excluded_count": excluded_count
 	}), req)
 }
 
@@ -1146,6 +1190,9 @@ export func setup_routes(server) {
 	server = server.route("GET", "/discovery.js", func(req) { return dispatch_request(req, serve_static) })
 	server = server.route("GET", "/settings.html", func(req) { return dispatch_request(req, serve_static) })
 	server = server.route("GET", "/settings.js", func(req) { return dispatch_request(req, serve_static) })
+
+	server = server.route("GET", "/api/discovery/exclusions", func(req) { return dispatch_request(req, api_discovery_exclusions) })
+	server = server.route("PUT", "/api/discovery/exclusions", func(req) { return dispatch_request(req, api_discovery_exclusions) })
 
 	// API routes
 	server = server.route("GET", "/api/repos", func(req) { return dispatch_request(req, api_list_repos) })
