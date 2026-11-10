@@ -1,0 +1,113 @@
+{
+  "platform": "macOS-26.6.2-x86_64-i386-64bit",
+  "runtime": "kujo 1.9.0",
+  "rename": {
+    "staged_count": 0,
+    "unstaged_count": 1,
+    "file_changes": [
+      {
+        "file_path": "old -> new",
+        "staged": 0,
+        "status_code": "R ",
+        "status_label": "renamed",
+        "unstaged": 1,
+        "untracked": 0
+      }
+    ]
+  },
+  "detached": {
+    "branch": "HEAD (no branch)",
+    "is_detached": 0
+  },
+  "discovery": {
+    "budget_after": {
+      "entries_remaining": 100,
+      "results_remaining": 1
+    },
+    "count": 3
+  },
+  "partial_scan": {
+    "changes": [
+      {
+        "n": 0
+      }
+    ],
+    "failed": true,
+    "snapshots": [
+      {
+        "n": 1
+      }
+    ]
+  },
+  "rejected_import": {
+    "status": 413,
+    "body": "{\"error\":\"Imported settings are limited to 50 keys\",\"success\":false}",
+    "repos_after": 1
+  },
+  "malformed_json": {
+    "status": 500,
+    "body": "Internal Server Error"
+  },
+  "host_validation": {
+    "status": 200,
+    "body": "{\"success\":true}"
+  },
+  "backup": {
+    "status": 500,
+    "bytes": 21,
+    "body": "Internal Server Error"
+  },
+  "health_after_backup": {
+    "status": 200
+  },
+  "benchmarks": [
+    {
+      "repos": 30,
+      "snapshots": 7500,
+      "http_ms": [
+        24.99,
+        24.33,
+        25.79
+      ],
+      "median_ms": 24.99,
+      "http_bytes": 22150,
+      "cli_json_bytes": 22844,
+      "http_status": 200,
+      "http_error": null,
+      "cli_exit": 0,
+      "cli_error": ""
+    },
+    {
+      "repos": 100,
+      "snapshots": 25000,
+      "http_ms": [
+        103.93,
+        100.74,
+        99.89
+      ],
+      "median_ms": 100.74,
+      "http_bytes": 73814,
+      "cli_json_bytes": 75072,
+      "http_status": 200,
+      "http_error": null,
+      "cli_exit": 0,
+      "cli_error": ""
+    },
+    {
+      "repos": 500,
+      "snapshots": 125000,
+      "http_ms": [
+        357.95,
+        482.41,
+        420.51
+      ],
+      "median_ms": 420.51,
+      "http_bytes": 370214,
+      "cli_json_bytes": 374672,
+      "http_status": 200,
+      "http_error": null,
+      "cli_exit": 0,
+      "cli_error": ""
+    }
+  ]
+}
