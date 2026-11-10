@@ -2,6 +2,8 @@
 
 ## Strategy
 
+CI pins Kujo **v1.9.0** and checksum-verifies the published native archive before running the checks below. Dependabot checks GitHub Actions pins weekly; the Kujo release pin is updated explicitly and verified with the full suite. RepoRadar has no third-party Kujo package dependencies.
+
 RepoRadar uses Kujo's built-in testing framework (`kujo test`). Tests are organized in the `tests/` directory.
 
 ## Running Tests

@@ -25,7 +25,7 @@ Current release: **v0.4.0**
 
 ## Requirements
 
-- **Kujo v1.0.0+** — The Kujo language runtime
+- **Kujo v1.9.0** — The Kujo language runtime
 - **Git** — Must be installed and available on `PATH`
 - **macOS, Linux, or WSL** — Any Unix-like environment is supported
 

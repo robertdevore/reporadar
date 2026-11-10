@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- **Kujo v1.0.0+** — The Kujo programming language runtime
+- **Kujo v1.9.0** — The Kujo programming language runtime
 - **Git** — Must be installed and accessible in your PATH
 - **macOS, Linux, or WSL** — Any Unix-like environment
 
