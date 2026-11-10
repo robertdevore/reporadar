@@ -2580,3 +2580,13 @@ a:hover {
     font-size: 24px;
   }
 }
+
+/* Keep repository actions within their card at every viewport width. */
+.repo-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.repo-detail-actions .btn { flex: 0 1 auto; min-width: 0; max-width: 100%; padding: 8px 10px; white-space: normal; }
+.repo-detail-actions .btn svg { flex-shrink: 0; }
+.result-item { flex-wrap: wrap; }
+.result-item .result-description { flex: 1 1 180px; min-width: 0; }
+.result-path { overflow-wrap: anywhere; }
+.result-item .btn { flex: 0 0 auto; padding: 6px 10px; }
+.excluded-heading { cursor: pointer; font-weight: 600; }
