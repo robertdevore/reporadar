@@ -50,7 +50,7 @@ async function startDiscovery() {
 
     const newRepos = data.new_repos || [];
     document.getElementById('result-title').textContent =
-      'Found ' + data.total_found + ' repos (' + newRepos.length + ' new, ' + data.already_tracked + ' already tracked)';
+      (data.truncated ? 'Incomplete: discovery limit reached. Search a narrower directory. Found ' : 'Found ') + data.total_found + ' repos (' + newRepos.length + ' new, ' + data.already_tracked + ' already tracked)';
 
     if (newRepos.length > 0) {
       document.getElementById('btn-add-selected').style.display = 'inline-flex';

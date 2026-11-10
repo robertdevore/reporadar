@@ -1,7 +1,7 @@
 // main.kujo — RepoRadar CLI Entry Point
 // Usage: kujo run src/main.kujo [command] [options]
 
-from src.server import start_server, discover_repos
+from src.server import start_server, discover_report
 from src.scanner import scan_repo_with_options, collect_recent_commits
 from src.registry import add_repo, remove_repo, get_all_repos, get_repo_by_id, get_repo_stale_map, store_scan_result, store_repo_commits
 from src.db import init_db, init_db_with_options, get_setting, get_db_path
@@ -32,6 +32,8 @@ export func print_usage() {
 	print("")
 	print("Health options:")
 	print("  --json                          Emit JSON only (schema_version: 1)")
+	print("  --summary                       JSON summary with an empty repos array")
+	print("  --output=<path>                 Save health JSON and emit a concise receipt")
 	print("  --dirty-only                    Include only dirty working trees")
 	print("  --attention-only                Include only repositories needing attention")
 	print("  --fail-on-attention             Exit 3 when attention items exist")
@@ -82,13 +84,42 @@ export func unknown_flag(argv, allowed) {
 			mut j = 0
 			while j < len(allowed) {
 				if token == allowed[j] { known = true }
+				if allowed[j] == "--output=" && starts_with(token, "--output=") { known = true }
 				j = j + 1
 			}
+			if token == "--output=" { return "--output= requires a file path" }
 			if known == false { return token }
 		}
 		i = i + 1
 	}
 	return ""
+}
+
+/// Optional machine-output modes keep default schema/output unchanged.
+export func output_path(argv) {
+	mut i = 0
+	while i < len(argv) {
+		if starts_with(argv[i], "--output=") { return substring(argv[i], 9, len(argv[i])) }
+		i = i + 1
+	}
+	return ""
+}
+export func emit_health_report(report, argv, title) {
+	mut path = output_path(argv)
+	if has_flag(argv, "--summary") {
+		report["repos"] = []
+		report["summary_only"] = true
+	}
+	if path != "" {
+		try { write_file(path, to_json_pretty(report)) } except err {
+			emit_cli_error(true, "Could not write report: " + to_string(err), 1)
+			return false
+		}
+		print(to_json({"success":report["success"],"output":path,"exit_code":report["exit_code"]}))
+	} else if has_flag(argv, "--json") || has_flag(argv, "--summary") {
+		print(to_json_pretty(report))
+	} else { print_human_report(report, title) }
+	return true
 }
 
 /// emit_cli_error keeps JSON command failures machine-parseable.
@@ -187,8 +218,8 @@ export func run_bulk_scan(db, quiet) {
 
 /// cmd_list reports the latest stored repository state.
 export func cmd_list(argv) {
-	mut invalid = unknown_flag(argv, ["--json", "--dirty-only", "--attention-only"])
-	mut json_mode = has_flag(argv, "--json")
+	mut invalid = unknown_flag(argv, ["--json", "--summary", "--output=", "--dirty-only", "--attention-only"])
+	mut json_mode = has_flag(argv, "--json") || has_flag(argv, "--summary") || output_path(argv) != ""
 	if invalid != "" { emit_cli_error(json_mode, "unknown option: " + invalid, 2); return 2 }
 	mut include_mode = "all"
 	if has_flag(argv, "--attention-only") { include_mode = "attention" }
@@ -198,14 +229,14 @@ export func cmd_list(argv) {
 	report["command"] = "list"
 	report["success"] = true
 	report["exit_code"] = 0
-	if json_mode { print(to_json_pretty(report)) } else { print_human_report(report, "Repository Health") }
+	if !emit_health_report(report, argv, "Repository Health") { return 1 }
 	return 0
 }
 
 /// cmd_scan scans a single repository and returns its normalized status.
 export func cmd_scan(repo_id_str, argv) {
-	mut invalid = unknown_flag(argv, ["--json", "--fail-on-attention"])
-	mut json_mode = has_flag(argv, "--json")
+	mut invalid = unknown_flag(argv, ["--json", "--summary", "--output=", "--fail-on-attention"])
+	mut json_mode = has_flag(argv, "--json") || has_flag(argv, "--summary") || output_path(argv) != ""
 	if invalid != "" { emit_cli_error(json_mode, "unknown option: " + invalid, 2); return 2 }
 	mut repo_id = parse_int(repo_id_str)
 	if repo_id <= 0 { emit_cli_error(json_mode, "repo ID must be a positive number", 2); return 2 }
@@ -235,14 +266,14 @@ export func cmd_scan(repo_id_str, argv) {
 	}
 	report["success"] = scan_result["success"]
 	report["exit_code"] = exit_code
-	if json_mode { print(to_json_pretty(report)) } else { print_human_report(report, "Repository Scan") }
+	if !emit_health_report(report, argv, "Repository Scan") { return 1 }
 	return exit_code
 }
 
 /// cmd_scan_all scans all repositories and emits a complete health report.
 export func cmd_scan_all(argv) {
-	mut invalid = unknown_flag(argv, ["--json", "--dirty-only", "--attention-only", "--fail-on-attention"])
-	mut json_mode = has_flag(argv, "--json")
+	mut invalid = unknown_flag(argv, ["--json", "--summary", "--output=", "--dirty-only", "--attention-only", "--fail-on-attention"])
+	mut json_mode = has_flag(argv, "--json") || has_flag(argv, "--summary") || output_path(argv) != ""
 	if invalid != "" { emit_cli_error(json_mode, "unknown option: " + invalid, 2); return 2 }
 	mut include_mode = "all"
 	if has_flag(argv, "--attention-only") { include_mode = "attention" }
@@ -258,14 +289,14 @@ export func cmd_scan_all(argv) {
 	if scan_info["errors"] > 0 { exit_code = 1 }
 	report["success"] = scan_info["errors"] == 0
 	report["exit_code"] = exit_code
-	if json_mode { print(to_json_pretty(report)) } else { print_human_report(report, "Bulk Scan Results") }
+	if !emit_health_report(report, argv, "Bulk Scan Results") { return 1 }
 	return exit_code
 }
 
 /// cmd_review provides the opinionated agent review surface.
 export func cmd_review(argv) {
-	mut invalid = unknown_flag(argv, ["--json", "--dirty-only", "--attention-only", "--scan", "--all", "--fail-on-attention", "--no-fail-on-attention"])
-	mut json_mode = has_flag(argv, "--json")
+	mut invalid = unknown_flag(argv, ["--json", "--summary", "--output=", "--dirty-only", "--attention-only", "--scan", "--all", "--fail-on-attention", "--no-fail-on-attention"])
+	mut json_mode = has_flag(argv, "--json") || has_flag(argv, "--summary") || output_path(argv) != ""
 	if invalid != "" { emit_cli_error(json_mode, "unknown option: " + invalid, 2); return 2 }
 	mut include_mode = "attention"
 	if has_flag(argv, "--all") { include_mode = "all" }
@@ -282,7 +313,7 @@ export func cmd_review(argv) {
 	if scan_info["errors"] > 0 { exit_code = 1 }
 	report["success"] = scan_info["errors"] == 0 && report["summary"]["errors"] == 0
 	report["exit_code"] = exit_code
-	if json_mode { print(to_json_pretty(report)) } else { print_human_report(report, "Ecosystem Review") }
+	if !emit_health_report(report, argv, "Ecosystem Review") { return 1 }
 	return exit_code
 }
 
@@ -308,7 +339,9 @@ export func cmd_remove(repo_id_str) {
 export func cmd_discover(parent_path) {
 	mut db = init_db()
 	mut ignored_str = get_setting(db, "ignored_folders", "node_modules,vendor,.cache,dist,build,.git")
-	mut discovered = discover_repos(parent_path, 3, 0, split(ignored_str, ","))
+	mut discovery = discover_report(parent_path, 3, 0, split(ignored_str, ","), {"entries_remaining":25000,"results_remaining":1000})
+	mut discovered = discovery["repos"]
+	if discovery["truncated"] { print("WARNING: discovery limits reached; results are incomplete. Search a narrower directory.") }
 	print("")
 	print("=== Discovered " + to_string(len(discovered)) + " Git repos under " + parent_path + " ===")
 	print("")
@@ -335,7 +368,7 @@ export func cmd_export() {
 /// cmd_version emits a stable human or machine-readable version result.
 export func cmd_version(argv) {
 	mut invalid = unknown_flag(argv, ["--json"])
-	mut json_mode = has_flag(argv, "--json")
+	mut json_mode = has_flag(argv, "--json") || has_flag(argv, "--summary") || output_path(argv) != ""
 	if invalid != "" { emit_cli_error(json_mode, "unknown option: " + invalid, 2); return 2 }
 	if json_mode {
 		print(to_json_pretty({"success": true, "app": "reporadar", "version": app_version(), "exit_code": 0}))
@@ -348,7 +381,7 @@ export func cmd_version(argv) {
 /// cmd_doctor verifies the dependencies and state agents need before automation.
 export func cmd_doctor(argv) {
 	mut invalid = unknown_flag(argv, ["--json"])
-	mut json_mode = has_flag(argv, "--json")
+	mut json_mode = has_flag(argv, "--json") || has_flag(argv, "--summary") || output_path(argv) != ""
 	if invalid != "" { emit_cli_error(json_mode, "unknown option: " + invalid, 2); return 2 }
 
 	mut git_result = execute_status("git --version")

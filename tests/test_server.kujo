@@ -1,3 +1,4 @@
+from src.server import is_loopback_authority
 // RepoRadar HTTP boundary unit tests
 
 from src.server import is_same_origin_request, is_json_request, mutation_request_error, security_headers
@@ -33,4 +34,20 @@ test_group "HTTP mutation boundary" {
 		let headers = security_headers()
 		assert_true(has_key(headers, "Permissions-Policy") == 1)
 	}
+}
+
+
+test_group "loopback authority" {
+    test "valid aliases and ports" {
+        assert_equal(is_loopback_authority("localhost"), true)
+        assert_equal(is_loopback_authority("127.0.0.1:8080"), true)
+        assert_equal(is_loopback_authority("[::1]:8080"), true)
+    }
+    test "missing and hostile hosts" {
+        assert_equal(is_loopback_authority(""), false)
+        assert_equal(is_loopback_authority("localhost.evil.invalid"), false)
+        assert_equal(is_loopback_authority("localhost:0"), false)
+        assert_equal(is_loopback_authority("localhost:65536"), false)
+        assert_equal(is_loopback_authority("localhost:port"), false)
+    }
 }

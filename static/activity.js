@@ -2,7 +2,13 @@
 
 let currentDays = 7;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const data = await apiFetch('/api/settings');
+    const configuredDays = parseInt(data.settings.default_activity_window, 10);
+    currentDays = configuredDays > 0 ? Math.min(365, configuredDays) : 7;
+  } catch (err) { showToast('Could not load activity settings', 'error'); }
+  document.querySelectorAll('.window-btn').forEach(btn => btn.classList.toggle('active', Number(btn.dataset.days) === currentDays));
   setupWindowButtons();
   loadActivity(currentDays);
 });

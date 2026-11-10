@@ -44,7 +44,7 @@ function renderDetail(data) {
   currentCommits = commits;
   const scanHistory = data.scan_history || [];
 
-  let statusBadge = '<span class="badge badge-clean">Clean</span>';
+  let statusBadge = repo.is_clean == null ? '<span class="badge">Unscanned</span>' : '<span class="badge badge-clean">Clean</span>';
   if (repo.scan_error && repo.scan_error !== '') {
     statusBadge = '<span class="badge badge-error">Error: ' + escHtml(repo.scan_error) + '</span>';
   } else if (repo.is_clean === 0) {

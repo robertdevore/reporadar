@@ -57,6 +57,12 @@ jobs:
       - name: Run server smoke harness
         run: python3 tests/server_smoke_harness.py
 
+      - name: Run hardening regressions
+        run: python3 tests/hardening_harness.py
+
+      - name: Run frontend regressions
+        run: node tests/frontend_harness.js
+
       - name: Check browser JavaScript syntax
         shell: bash
         run: |

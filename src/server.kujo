@@ -3,8 +3,118 @@
 
 from src.db import init_db, get_db_path, get_setting, set_setting, escape_sql
 from src.scanner import validate_git_repo, validate_repo_path, get_canonical_path, scan_repo_with_options, collect_recent_commits
-from src.registry import add_repo, remove_repo, update_repo, get_all_repos, get_repo_by_id, store_scan_result, store_repo_commits, get_repo_file_changes, get_repo_scan_history, get_repo_commits, get_commits_in_window, get_commits_by_day, get_commit_count_per_repo
+from src.registry import add_repo, remove_repo, update_repo, get_all_repos, get_repo_by_id, store_scan_result, store_repo_commits, get_repo_file_changes, get_repo_scan_history, get_repo_commits, get_activity_feed, get_activity_total, get_repo_stale_map, get_commits_by_day, get_commit_count_per_repo
 from src.version import app_version
+from src.health_report import build_review_report
+
+/// Validate authority independently of Origin; no suffix or username aliases.
+export func is_loopback_authority(host) {
+	if !is_string(host) { return false }
+	mut name = host
+	mut port = ""
+	if starts_with(host, "[::1]:") { name = "[::1]"; port = substring(host, 6, len(host)) }
+	else if contains(host, ":") == 1 && host != "[::1]" {
+		mut parts = split(host, ":")
+		if len(parts) != 2 { return false }
+		name = parts[0]; port = parts[1]
+	}
+	if name != "127.0.0.1" && name != "localhost" && name != "[::1]" { return false }
+	if host != name {
+		if port == "" { return false }
+		mut i = 0
+		while i < len(port) {
+			mut ch = char_at(port, i)
+			if ch < "0" || ch > "9" { return false }
+			i = i + 1
+		}
+		if parse_int(port) < 1 || parse_int(port) > 65535 { return false }
+	}
+	return true
+}
+
+export func repo_payload_error(data, require_path) {
+	if !is_dict(data) { return "Repository must be an object" }
+	if require_path {
+		if !is_string(get(data, "path")) { return "Path must be a string" }
+		if trim(data["path"]) == "" { return "Path is required" }
+	}
+	mut fields = ["display_name", "group_name", "tags", "notes"]
+	mut i = 0
+	while i < len(fields) {
+		mut value = get(data, fields[i])
+		if value != null && !is_string(value) { return fields[i] + " must be a string" }
+		i = i + 1
+	}
+	return ""
+}
+
+export func settings_payload_error(settings) {
+	if !is_dict(settings) { return "Settings must be an object" }
+	mut names = keys(settings)
+	mut i = 0
+	while i < len(names) {
+		mut value = settings[names[i]]
+		if is_array(value) || is_dict(value) || value == null { return "Settings values must be scalar" }
+		i = i + 1
+	}
+	return ""
+}
+
+/// All route callbacks pass this boundary before invoking a handler.
+export func dispatch_request(req, handler) {
+	if !is_loopback_authority(request_header(req, "Host", "host")) {
+		return add_cors(json_response(403, {"success": false, "error": "Invalid localhost authority"}), req)
+	}
+	mut method = req["method"]
+	mut path = req["path"]
+	mut json_body = (method == "POST" && (path == "/api/repos" || path == "/api/discover" || path == "/api/repos/bulk-add" || path == "/api/import")) || method == "PUT"
+	if method == "POST" || method == "PUT" || method == "DELETE" {
+		mut policy = mutation_request_error(req, 0)
+		if json_body { policy = mutation_request_error(req, 1) }
+		if policy != null { return mutation_error_response(policy, req) }
+	}
+	if json_body {
+		mut data = null
+		try { data = parse_json(req["body"]) } except err {
+			return add_cors(json_response(400, {"success": false, "error": "Invalid JSON"}), req)
+		}
+		if !is_dict(data) { return add_cors(json_response(400, {"success": false, "error": "JSON body must be an object"}), req) }
+		mut error = ""
+		if path == "/api/import" || path == "/api/repos/bulk-add" {
+			mut repos = get(data, "repos")
+			if !is_array(repos) { error = "Repos must be an array" }
+			else {
+				if len(repos) > 1000 { return add_cors(json_response(413, {"success": false, "error": "Repository limit is 1000"}), req) }
+				mut i = 0
+				while i < len(repos) && error == "" { error = repo_payload_error(repos[i], true); i = i + 1 }
+			}
+		} else if path == "/api/repos" || starts_with(path, "/api/repos/") {
+			error = repo_payload_error(data, method == "POST")
+		} else if path == "/api/discover" {
+			if !is_string(get(data, "path")) { error = "Path must be a string" }
+			else if trim(data["path"]) == "" { error = "Path is required" }
+			if is_string(get(data, "path")) && data["path"] == "/" { error = "Choose a directory below the filesystem root" }
+			mut hidden = get(data, "include_hidden")
+			if hidden != null && !is_int(hidden) { error = "include_hidden must be an integer" }
+			mut depth = get(data, "max_depth")
+			if depth != null && !is_int(depth) { error = "max_depth must be an integer" }
+		}
+		if error == "" && (path == "/api/settings" || (path == "/api/import" && has_key(data, "settings") == 1)) {
+			mut settings = get(data, "settings")
+			error = settings_payload_error(settings)
+			if error == "" && len(keys(settings)) > 50 {
+				return add_cors(json_response(413, {"success": false, "error": "Settings limit is 50 keys"}), req)
+			}
+		}
+		if error != "" { return add_cors(json_response(400, {"success": false, "error": error}), req) }
+		req["data"] = data
+	}
+	try { return handler(req) } except err {
+		// Preserve the server-side diagnostic; clients receive a stable bounded error.
+		print("Request failed " + method + " " + path + ": " + to_string(err))
+		return add_cors(json_response(500, {"success": false, "error": "Request failed; see server log"}), req)
+	}
+}
 
 /// is_allowed_origin returns true for same-machine browser origins.
 export func is_allowed_origin(origin) {
@@ -180,7 +290,7 @@ export func api_add_repo(req) {
 	if request_error != null { return mutation_error_response(request_error, req) }
 
 	mut body = req["body"]
-	mut data = parse_json(body)
+	mut data = req["data"]
 
 	mut path = get(data, "path")
 	if path == null || path == "" {
@@ -244,7 +354,7 @@ export func api_update_repo(req) {
 
 	mut repo_id = parse_int(repo_id_str)
 	mut body = req["body"]
-	mut data = parse_json(body)
+	mut data = req["data"]
 
 	mut display_name = get(data, "display_name")
 	mut group_name = get(data, "group_name")
@@ -360,86 +470,28 @@ export func api_dashboard_summary(req) {
 	mut db = init_db()
 	mut repos = get_all_repos(db)
 
-	mut summary = {
-		"total": len(repos),
-		"clean": 0,
-		"dirty": 0,
-		"ahead": 0,
-		"behind": 0,
-		"diverged": 0,
-		"no_remote": 0,
-		"errors": 0,
-		"stale": 0,
-		"dependabot_alerts": 0,
-		"most_recently_active": "",
-		"last_full_scan": ""
-	}
-
-	mut stale_days_str = get_setting(db, "stale_threshold_days", "14")
-	mut stale_days = parse_int(stale_days_str)
+	mut stale_days = parse_int(get_setting(db, "stale_threshold_days", "14"))
+	mut report = build_review_report(repos, get_repo_stale_map(db, stale_days), "all", "")
+	mut summary = report["summary"]
+	summary["dependabot_alerts"] = summary["security_alerts"]
+	summary["attention_repos"] = summary["attention"]
+	summary["most_recently_active"] = ""
+	summary["last_full_scan"] = ""
 	mut most_recent_date = ""
-
 	mut i = 0
 	while i < len(repos) {
 		mut repo = repos[i]
+		if repo["latest_commit_date"] != null && repo["latest_commit_date"] > most_recent_date {
+			most_recent_date = repo["latest_commit_date"]
+			summary["most_recently_active"] = repo["display_name"]
+		}
 		i = i + 1
-
-		if has_key(repo, "is_clean") == 1 {
-			if repo["is_clean"] == 1 {
-				summary["clean"] = summary["clean"] + 1
-			} else {
-				summary["dirty"] = summary["dirty"] + 1
-			}
-		}
-
-		if has_key(repo, "ahead_count") == 1 {
-			if to_int(repo["ahead_count"]) > 0 && to_int(repo["behind_count"]) > 0 {
-				summary["diverged"] = summary["diverged"] + 1
-			} else if to_int(repo["ahead_count"]) > 0 {
-				summary["ahead"] = summary["ahead"] + 1
-			} else if to_int(repo["behind_count"]) > 0 {
-				summary["behind"] = summary["behind"] + 1
-			}
-		}
-
-		if has_key(repo, "has_remote") == 1 {
-			if repo["has_remote"] == 0 || repo["has_remote"] == null {
-				summary["no_remote"] = summary["no_remote"] + 1
-			}
-		}
-
-		if has_key(repo, "scan_error") == 1 {
-			if repo["scan_error"] != null && repo["scan_error"] != "" {
-				summary["errors"] = summary["errors"] + 1
-			}
-		}
-
-		if has_key(repo, "dependabot_alert_count") == 1 {
-			if repo["dependabot_alert_count"] != null && to_int(repo["dependabot_alert_count"]) > 0 {
-				summary["dependabot_alerts"] = summary["dependabot_alerts"] + to_int(repo["dependabot_alert_count"])
-			}
-		}
-
-		// Most recently active
-		if has_key(repo, "latest_commit_date") == 1 {
-			if repo["latest_commit_date"] != null && repo["latest_commit_date"] > most_recent_date {
-				most_recent_date = repo["latest_commit_date"]
-				summary["most_recently_active"] = get_default(repo, "display_name", get_default(repo, "name", ""))
-			}
-		}
-
-		// Stale detection relies on the frontend to compute staleness
 	}
 
 	// Get last full scan time
 	mut scan_rows = db_query(db, "SELECT MAX(completed_at) as last_scan FROM scan_runs")
 	if len(scan_rows) > 0 && scan_rows[0]["last_scan"] != null {
 		summary["last_full_scan"] = scan_rows[0]["last_scan"]
-	}
-
-	mut stale_rows = db_query(db, "SELECT COUNT(*) as stale_count FROM repos r LEFT JOIN (SELECT repo_id, latest_commit_date, ROW_NUMBER() OVER (PARTITION BY repo_id ORDER BY scanned_at DESC, id DESC) as rn FROM repo_status_snapshots) s ON r.id = s.repo_id AND s.rn = 1 WHERE r.archived = 0 AND (s.latest_commit_date IS NULL OR s.latest_commit_date = '' OR julianday('now') - julianday(s.latest_commit_date) > " + to_string(stale_days) + ")")
-	if len(stale_rows) > 0 && stale_rows[0]["stale_count"] != null {
-		summary["stale"] = stale_rows[0]["stale_count"]
 	}
 
 	return add_cors(json_response(200, {"success": true, "summary": summary}), req)
@@ -452,7 +504,8 @@ export func api_activity(req) {
 	}
 
 	mut query_params = req["query"]
-	mut days_str = get_default(query_params, "days", "7")
+	mut db = init_db()
+	mut days_str = get_default(query_params, "days", get_setting(db, "default_activity_window", "7"))
 	mut days = parse_int(days_str)
 	if days < 1 {
 		days = 7
@@ -461,8 +514,8 @@ export func api_activity(req) {
 		days = 365
 	}
 
-	mut db = init_db()
-	mut commits = get_commits_in_window(db, days)
+	mut commits = get_activity_feed(db, days)
+	mut total_commits = get_activity_total(db, days)
 	mut commits_by_day = get_commits_by_day(db, days)
 	mut commits_per_repo = get_commit_count_per_repo(db, days)
 
@@ -520,7 +573,7 @@ export func api_activity(req) {
 	return add_cors(json_response(200, {
 		"success": true,
 		"days": days,
-		"total_commits": len(commits),
+		"total_commits": total_commits,
 		"commits_by_day": commits_by_day,
 		"commits_per_repo": commits_per_repo,
 		"most_active": most_active,
@@ -610,7 +663,7 @@ export func api_discover(req) {
 	if request_error != null { return mutation_error_response(request_error, req) }
 
 	mut body = req["body"]
-	mut data = parse_json(body)
+	mut data = req["data"]
 
 	mut parent_path = get(data, "path")
 	if parent_path == null || parent_path == "" {
@@ -633,7 +686,8 @@ export func api_discover(req) {
 	mut ignored_str = get_setting(db, "ignored_folders", "node_modules,vendor,.cache,dist,build,.git")
 	mut ignored_folders = split(ignored_str, ",")
 
-	mut discovered = discover_repos(parent_path, max_depth, include_hidden, ignored_folders)
+	mut discovery = discover_report(parent_path, max_depth, include_hidden, ignored_folders, {"entries_remaining":25000,"results_remaining":1000})
+	mut discovered = discovery["repos"]
 
 	// Filter out already-tracked repos
 	mut tracked = get_all_repos(db)
@@ -657,87 +711,70 @@ export func api_discover(req) {
 	return add_cors(json_response(200, {
 		"success": true,
 		"parent_path": parent_path,
+		"truncated": discovery["truncated"],
+		"entries_examined": discovery["entries_examined"],
 		"total_found": len(discovered),
 		"new_repos": new_repos,
 		"already_tracked": len(discovered) - len(new_repos)
 	}), req)
 }
 
-/// discover_repos recursively searches for .git directories.
+/// Compatibility wrappers retain array results; report callers also receive limits.
 export func discover_repos(parent_path, max_depth, include_hidden, ignored_folders) {
-	mut budget = {"entries_remaining": 25000, "results_remaining": 1000}
-	return discover_repos_with_budget(parent_path, max_depth, include_hidden, ignored_folders, budget)
+	return discover_report(parent_path, max_depth, include_hidden, ignored_folders, {"entries_remaining":25000,"results_remaining":1000})["repos"]
 }
-
-/// discover_repos_with_budget shares deterministic entry/result limits across recursion.
 export func discover_repos_with_budget(parent_path, max_depth, include_hidden, ignored_folders, budget) {
+	return discover_report(parent_path, max_depth, include_hidden, ignored_folders, budget)["repos"]
+}
+export func discover_report(parent_path, max_depth, include_hidden, ignored_folders, budget) {
 	mut results = []
-
-	if max_depth <= 0 || budget["entries_remaining"] <= 0 || budget["results_remaining"] <= 0 {
-		return results
-	}
-
-	if !file_exists(parent_path) || !path_is_dir(parent_path) {
-		return results
-	}
-
-	mut entries = list_dir(parent_path)
-	mut ei = 0
-	while ei < len(entries) {
-		if budget["entries_remaining"] <= 0 || budget["results_remaining"] <= 0 {
-			break
+	mut remaining = budget["entries_remaining"]
+	mut limit = budget["results_remaining"]
+	mut truncated = false
+	if !file_exists(parent_path) || !path_is_dir(parent_path) { return {"repos":[],"truncated":false,"entries_examined":0,"entry_limit":remaining,"result_limit":limit} }
+	if path_absolute(parent_path) == "/" { throw("Choose a directory below the filesystem root") }
+	mut queue = [{"path":path_absolute(parent_path),"depth":max_depth,"after":""}]
+	mut index = 0
+	while index < len(queue) {
+		if remaining <= 1 || len(results) >= limit { truncated = true; break }
+		mut item = queue[index]
+		index = index + 1
+		mut path = item["path"]
+		if item["depth"] <= 0 || !path_is_dir(path) { continue }
+		mut page = null
+		try {
+			page = list_dir_beneath(dirname(path), basename(path), item["after"], "", 1000, remaining - 1)
+		} except err {
+			if contains(to_string(err), "[scan_limit]") { remaining = 0; truncated = true; break }
+			throw(err)
 		}
-		budget["entries_remaining"] = budget["entries_remaining"] - 1
-		mut entry = entries[ei]
-		ei = ei + 1
-
-		mut full_path = join_path(parent_path, entry)
-
-		// Skip ignored folders
-		mut should_skip = 0
-		mut ig = 0
-		while ig < len(ignored_folders) {
-			mut ignored = trim(ignored_folders[ig])
-			ig = ig + 1
-			if ignored == "" { continue }
-			if entry == ignored {
-				should_skip = 1
-				break
+		remaining = remaining - page["scanned"]
+		mut entries = page["names"]
+		if page["truncated"] { queue = push(queue, {"path":path,"depth":item["depth"],"after":page["next_cursor"]}) }
+		mut i = 0
+		while i < len(entries) {
+			if len(results) >= limit { truncated = true; break }
+			mut entry = entries[i]
+			i = i + 1
+			mut full_path = join_path(path, entry)
+			if path_is_symlink(full_path) { continue }
+			if entry == ".git" && (path_is_dir(full_path) || file_exists(full_path)) {
+				results = push(results, {"name":basename(path),"path":path})
+				continue
 			}
-		}
-
-		if should_skip == 1 && entry != ".git" {
-			continue
-		}
-
-		// Skip hidden folders unless included
-		if include_hidden == 0 && starts_with(entry, ".") && entry != ".git" {
-			continue
-		}
-
-		if path_is_dir(full_path) {
-			if entry == ".git" {
-				// Found a git repo at parent
-				mut repo_path = parent_path
-				mut name = basename(repo_path)
-				results = push(results, {
-					"name": name,
-					"path": repo_path
-				})
-				budget["results_remaining"] = budget["results_remaining"] - 1
-			} else {
-				// Recurse
-				mut sub_results = discover_repos_with_budget(full_path, max_depth - 1, include_hidden, ignored_folders, budget)
-				mut sr = 0
-				while sr < len(sub_results) {
-					results = push(results, sub_results[sr])
-					sr = sr + 1
-				}
+			mut skip = false
+			mut j = 0
+			while j < len(ignored_folders) {
+				if entry == trim(ignored_folders[j]) { skip = true }
+				j = j + 1
+			}
+			if skip || (include_hidden == 0 && starts_with(entry, ".")) { continue }
+			if item["depth"] > 1 && path_is_dir(full_path) {
+				queue = push(queue, {"path":full_path,"depth":item["depth"]-1,"after":""})
 			}
 		}
 	}
-
-	return results
+	return {"repos":results,"truncated":truncated,"entries_examined":budget["entries_remaining"]-remaining,"entry_limit":budget["entries_remaining"],"result_limit":limit}
 }
 
 /// api_bulk_add adds multiple repos at once.
@@ -753,7 +790,7 @@ export func api_bulk_add(req) {
 	if request_error != null { return mutation_error_response(request_error, req) }
 
 	mut body = req["body"]
-	mut data = parse_json(body)
+	mut data = req["data"]
 	mut repos_to_add = get(data, "repos")
 	if repos_to_add == null {
 		return add_cors(json_response(400, {"success": false, "error": "Repos array is required"}), req)
@@ -826,7 +863,7 @@ export func api_settings_update(req) {
 	if request_error != null { return mutation_error_response(request_error, req) }
 
 	mut body = req["body"]
-	mut data = parse_json(body)
+	mut data = req["data"]
 	mut settings = get(data, "settings")
 	if settings == null {
 		return add_cors(json_response(400, {"success": false, "error": "Settings object is required"}), req)
@@ -895,7 +932,7 @@ export func api_import(req) {
 	if request_error != null { return mutation_error_response(request_error, req) }
 
 	mut body = req["body"]
-	mut data = parse_json(body)
+	mut data = req["data"]
 
 	// Validate structure
 	if get(data, "app") != "reporadar" {
@@ -919,6 +956,8 @@ export func api_import(req) {
 		"details": []
 	}
 
+	db_begin_immediate(db)
+	try {
 	mut i = 0
 	while i < len(imported_repos) {
 		mut repo_data = imported_repos[i]
@@ -962,15 +1001,18 @@ export func api_import(req) {
 	mut imported_settings = get(data, "settings")
 	if imported_settings != null {
 		mut setting_keys = keys(imported_settings)
-		if len(setting_keys) > 50 {
-			return add_cors(json_response(413, {"success": false, "error": "Imported settings are limited to 50 keys"}), req)
-		}
 		mut si = 0
 		while si < len(setting_keys) {
 			mut key = setting_keys[si]
 			set_setting(db, key, to_string(imported_settings[key]))
 			si = si + 1
 		}
+	}
+
+		db_commit(db)
+	} except err {
+		db_rollback(db)
+		throw(err)
 	}
 
 	return add_cors(json_response(200, results), req)
@@ -987,11 +1029,27 @@ export func api_export_db(req) {
 		return add_cors(json_response(404, {"success": false, "error": "Database file not found"}), req)
 	}
 
-	mut content = read_file(db_path)
-	mut resp = http_response(200, content)
-	resp = set_header(resp, "Content-Type", "application/octet-stream")
-	resp = set_header(resp, "Content-Disposition", "attachment; filename=\"reporadar-backup.db\"")
-	return add_cors(resp, req)
+	mut directory = create_temp_dir(dirname(db_path), ".reporadar-backup-")
+	mut backup_db = null
+	mut backup_path = join_path(directory, "snapshot.db")
+	try {
+		backup_db = init_db()
+		db_execute(backup_db, "VACUUM INTO '" + escape_sql(backup_path) + "'")
+		db_close(backup_db)
+		backup_db = null
+		mut content = read_binary_file(backup_path)
+		delete_file(backup_path)
+		os_rmdir(directory)
+		mut resp = http_response(200, content)
+		resp = set_header(resp, "Content-Type", "application/octet-stream")
+		resp = set_header(resp, "Content-Disposition", "attachment; filename=\"reporadar-backup.db\"")
+		return add_cors(resp, req)
+	} except err {
+		if backup_db != null { db_close(backup_db) }
+		if file_exists(backup_path) { delete_file(backup_path) }
+		os_rmdir(directory)
+		throw(err)
+	}
 }
 
 // === Static file serving ===
@@ -1076,36 +1134,36 @@ export func serve_static(req) {
 export func setup_routes(server) {
 	// Capture this module scope for callbacks invoked by Kujo HTTP worker threads.
 	// Static file serving — register each file the dashboard needs
-	server = server.route("GET", "/", func(req) { return serve_static(req) })
-	server = server.route("GET", "/index.html", func(req) { return serve_static(req) })
-	server = server.route("GET", "/style.css", func(req) { return serve_static(req) })
-	server = server.route("GET", "/app.js", func(req) { return serve_static(req) })
-	server = server.route("GET", "/detail.html", func(req) { return serve_static(req) })
-	server = server.route("GET", "/detail.js", func(req) { return serve_static(req) })
-	server = server.route("GET", "/activity.html", func(req) { return serve_static(req) })
-	server = server.route("GET", "/activity.js", func(req) { return serve_static(req) })
-	server = server.route("GET", "/discovery.html", func(req) { return serve_static(req) })
-	server = server.route("GET", "/discovery.js", func(req) { return serve_static(req) })
-	server = server.route("GET", "/settings.html", func(req) { return serve_static(req) })
-	server = server.route("GET", "/settings.js", func(req) { return serve_static(req) })
+	server = server.route("GET", "/", func(req) { return dispatch_request(req, serve_static) })
+	server = server.route("GET", "/index.html", func(req) { return dispatch_request(req, serve_static) })
+	server = server.route("GET", "/style.css", func(req) { return dispatch_request(req, serve_static) })
+	server = server.route("GET", "/app.js", func(req) { return dispatch_request(req, serve_static) })
+	server = server.route("GET", "/detail.html", func(req) { return dispatch_request(req, serve_static) })
+	server = server.route("GET", "/detail.js", func(req) { return dispatch_request(req, serve_static) })
+	server = server.route("GET", "/activity.html", func(req) { return dispatch_request(req, serve_static) })
+	server = server.route("GET", "/activity.js", func(req) { return dispatch_request(req, serve_static) })
+	server = server.route("GET", "/discovery.html", func(req) { return dispatch_request(req, serve_static) })
+	server = server.route("GET", "/discovery.js", func(req) { return dispatch_request(req, serve_static) })
+	server = server.route("GET", "/settings.html", func(req) { return dispatch_request(req, serve_static) })
+	server = server.route("GET", "/settings.js", func(req) { return dispatch_request(req, serve_static) })
 
 	// API routes
-	server = server.route("GET", "/api/repos", func(req) { return api_list_repos(req) })
-	server = server.route("POST", "/api/repos", func(req) { return api_add_repo(req) })
-	server = server.route("DELETE", "/api/repos/:id", func(req) { return api_remove_repo(req) })
-	server = server.route("PUT", "/api/repos/:id", func(req) { return api_update_repo(req) })
-	server = server.route("POST", "/api/repos/:id/scan", func(req) { return api_scan_repo(req) })
-	server = server.route("GET", "/api/repos/:id", func(req) { return api_repo_detail(req) })
-	server = server.route("GET", "/api/dashboard/summary", func(req) { return api_dashboard_summary(req) })
-	server = server.route("GET", "/api/activity", func(req) { return api_activity(req) })
-	server = server.route("POST", "/api/scan/bulk", func(req) { return api_bulk_scan(req) })
-	server = server.route("POST", "/api/discover", func(req) { return api_discover(req) })
-	server = server.route("POST", "/api/repos/bulk-add", func(req) { return api_bulk_add(req) })
-	server = server.route("GET", "/api/settings", func(req) { return api_settings_get(req) })
-	server = server.route("PUT", "/api/settings", func(req) { return api_settings_update(req) })
-	server = server.route("GET", "/api/export", func(req) { return api_export(req) })
-	server = server.route("POST", "/api/import", func(req) { return api_import(req) })
-	server = server.route("GET", "/api/export/db", func(req) { return api_export_db(req) })
+	server = server.route("GET", "/api/repos", func(req) { return dispatch_request(req, api_list_repos) })
+	server = server.route("POST", "/api/repos", func(req) { return dispatch_request(req, api_add_repo) })
+	server = server.route("DELETE", "/api/repos/:id", func(req) { return dispatch_request(req, api_remove_repo) })
+	server = server.route("PUT", "/api/repos/:id", func(req) { return dispatch_request(req, api_update_repo) })
+	server = server.route("POST", "/api/repos/:id/scan", func(req) { return dispatch_request(req, api_scan_repo) })
+	server = server.route("GET", "/api/repos/:id", func(req) { return dispatch_request(req, api_repo_detail) })
+	server = server.route("GET", "/api/dashboard/summary", func(req) { return dispatch_request(req, api_dashboard_summary) })
+	server = server.route("GET", "/api/activity", func(req) { return dispatch_request(req, api_activity) })
+	server = server.route("POST", "/api/scan/bulk", func(req) { return dispatch_request(req, api_bulk_scan) })
+	server = server.route("POST", "/api/discover", func(req) { return dispatch_request(req, api_discover) })
+	server = server.route("POST", "/api/repos/bulk-add", func(req) { return dispatch_request(req, api_bulk_add) })
+	server = server.route("GET", "/api/settings", func(req) { return dispatch_request(req, api_settings_get) })
+	server = server.route("PUT", "/api/settings", func(req) { return dispatch_request(req, api_settings_update) })
+	server = server.route("GET", "/api/export", func(req) { return dispatch_request(req, api_export) })
+	server = server.route("POST", "/api/import", func(req) { return dispatch_request(req, api_import) })
+	server = server.route("GET", "/api/export/db", func(req) { return dispatch_request(req, api_export_db) })
 
 	return server
 }

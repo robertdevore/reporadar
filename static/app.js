@@ -41,7 +41,13 @@ document.addEventListener('DOMContentLoaded', () => {
   initPage();
 });
 
+let staleThresholdDays = 14;
 async function initPage() {
+  try {
+    const settings = await apiFetch('/api/settings');
+    const configuredDays = parseInt(settings.settings.stale_threshold_days, 10);
+    staleThresholdDays = configuredDays > 0 ? configuredDays : 14;
+  } catch (err) { showToast('Could not load dashboard settings', 'error'); }
   await Promise.all([loadRepos(), loadSummary()]);
   renderSummary(buildSummaryFromRepos(allRepos, lastServerSummary));
   loadFilterOptions();
@@ -243,14 +249,11 @@ async function loadSummary() {
 }
 
 function buildSummaryFromRepos(repos, fallback = {}) {
-  if (!repos || repos.length === 0) return fallback || {};
+  repos = repos || [];
   const attentionRepos = repos.filter(repo =>
-    matchStatusFilter(repo, 'dirty') ||
-    matchStatusFilter(repo, 'error') ||
-    matchStatusFilter(repo, 'behind') ||
-    matchStatusFilter(repo, 'diverged') ||
-    matchStatusFilter(repo, 'stale') ||
-    matchStatusFilter(repo, 'alerts')
+    repo.scan_error || repo.is_clean == null || repo.is_clean === 0 ||
+    Number(repo.ahead_count) > 0 || Number(repo.behind_count) > 0 ||
+    !repo.has_remote || matchStatusFilter(repo, 'stale') || matchStatusFilter(repo, 'alerts')
   ).length;
   return {
     total: repos.length,
@@ -262,7 +265,7 @@ function buildSummaryFromRepos(repos, fallback = {}) {
     diverged: repos.filter(repo => matchStatusFilter(repo, 'diverged')).length,
     no_remote: repos.filter(repo => matchStatusFilter(repo, 'no-remote')).length,
     stale: repos.filter(repo => matchStatusFilter(repo, 'stale')).length,
-    dependabot_alerts: repos.filter(repo => matchStatusFilter(repo, 'alerts')).length,
+    dependabot_alerts: repos.reduce((sum, repo) => sum + Math.max(0, Number(repo.dependabot_alert_count) || 0), 0),
     attention_repos: attentionRepos,
     last_full_scan: fallback.last_full_scan,
     most_recently_active: fallback.most_recently_active
@@ -857,19 +860,20 @@ function renderTable(syncUrl = true) {
 
 function matchStatusFilter(repo, filter) {
   switch (filter) {
-    case 'clean': return repo.is_clean === 1;
-    case 'dirty': return repo.is_clean === 0;
+    case 'clean': return !repo.scan_error && repo.is_clean === 1;
+    case 'dirty': return !repo.scan_error && repo.is_clean === 0;
     case 'staged': return (repo.staged_count || 0) > 0;
     case 'unstaged': return (repo.unstaged_count || 0) > 0;
     case 'untracked': return (repo.untracked_count || 0) > 0;
-    case 'ahead': return (repo.ahead_count || 0) > 0 && (repo.behind_count || 0) === 0;
-    case 'behind': return (repo.behind_count || 0) > 0 && (repo.ahead_count || 0) === 0;
-    case 'diverged': return repo.is_diverged === 1;
-    case 'no-remote': return repo.has_remote === 0 || repo.has_remote === null;
+    case 'ahead': return (repo.ahead_count || 0) > 0;
+    case 'behind': return (repo.behind_count || 0) > 0;
+    case 'diverged': return repo.ahead_count > 0 && repo.behind_count > 0;
+    case 'no-remote': return (repo.is_clean != null || !!repo.scan_error) && !repo.has_remote;
     case 'error': return repo.scan_error && repo.scan_error !== '';
     case 'alerts': return Number(repo.dependabot_alert_count || 0) > 0;
     case 'stale': {
-      const staleDays = 14;
+      if (repo.is_clean == null && !repo.scan_error) return false;
+      const staleDays = staleThresholdDays;
       if (!repo.latest_commit_date) return true;
       const commitDate = new Date(repo.latest_commit_date);
       const now = new Date();
@@ -899,7 +903,8 @@ function getSortValue(repo, col) {
 
 function renderRow(repo) {
   let rowClass = 'row-clean';
-  let stateBadge = '<span class="badge badge-clean">Clean</span>';
+  let stateBadge = repo.is_clean == null ? '<span class="badge">Unscanned</span>' : '<span class="badge badge-clean">Clean</span>';
+  if (repo.is_clean == null) rowClass = 'row-unscanned';
 
   if (repo.scan_error && repo.scan_error !== '') {
     rowClass = 'row-error';
