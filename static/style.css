@@ -2590,3 +2590,29 @@ a:hover {
 .result-path { overflow-wrap: anywhere; }
 .result-item .btn { flex: 0 0 auto; padding: 6px 10px; }
 .excluded-heading { cursor: pointer; font-weight: 600; }
+
+/* Tabler chevron-right replaces the platform-specific details marker. */
+.excluded-heading { display: flex; align-items: center; gap: 8px; list-style: none; }
+.excluded-heading::-webkit-details-marker { display: none; }
+.excluded-heading::marker { content: ''; }
+.excluded-chevron { flex-shrink: 0; transition: transform 0.15s ease; }
+#excluded-panel[open] .excluded-chevron { transform: rotate(90deg); }
+.branch-label { display: inline-block; max-width: 18ch; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; white-space: nowrap; }
+@media (min-width: 1024px) {
+  .repo-table { table-layout: fixed; }
+  .repo-table th { padding-left: 8px; padding-right: 8px; white-space: normal; overflow-wrap: anywhere; }
+  .repo-table th[data-column="group"] { width: 6%; }
+  .repo-table th[data-column="tags"] { width: 8%; }
+  .repo-table th[data-column="branch"] { width: 14%; }
+  .repo-table th[data-column="state"] { width: 7%; }
+  .repo-table th[data-column="staged"],
+  .repo-table th[data-column="alerts"] { width: 5%; }
+  .repo-table th[data-column="unstaged"] { width: 6%; }
+  .repo-table th[data-column="untracked"] { width: 7%; }
+  .repo-table th[data-column="ahead"],
+  .repo-table th[data-column="behind"] { width: 3%; }
+  .repo-table th[data-column="last_commit"] { width: 9%; }
+  .repo-table th[data-column="actions"] { width: 108px; }
+  .branch-label { max-width: 100%; }
+  .repo-table td { padding-left: 8px; padding-right: 8px; }
+}

@@ -901,6 +901,12 @@ function getSortValue(repo, col) {
   return typeof v === 'string' ? v.toLowerCase() : v;
 }
 
+// Display only: sorting, filtering and detail views retain the complete branch.
+function branchLabel(branch) {
+  const characters = Array.from(branch);
+  return characters.length > 18 ? characters.slice(0, 17).join('') + '…' : branch;
+}
+
 function renderRow(repo) {
   let rowClass = 'row-clean';
   let stateBadge = repo.is_clean == null ? '<span class="badge">Unscanned</span>' : '<span class="badge badge-clean">Clean</span>';
@@ -947,7 +953,7 @@ function renderRow(repo) {
       </td>
       <td data-column="group">${escHtml(repo.group_name || '-')}</td>
       <td data-column="tags">${tags || '-'}</td>
-      <td data-column="branch">${escHtml(branch)}</td>
+      <td data-column="branch"><span class="branch-label" title="${escAttr(branch)}">${escHtml(branchLabel(branch))}</span></td>
       <td data-column="state">${stateBadge}</td>
       <td data-column="staged">${repo.staged_count || 0}</td>
       <td data-column="unstaged">${repo.unstaged_count || 0}</td>
