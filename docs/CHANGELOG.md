@@ -1,28 +1,30 @@
 # Changelog
 
-## Metadata hardening — 2026-11-12
+## [0.5.0] — 2026-11-12
+
+### Metadata hardening
 
 - Resolve R11–R15: deterministic untracked status, redacted remote userinfo, NUL-framed commits, UTC activity dates, and bounded history collection with visible completeness.
 - Schema v4 migrates cached remotes/dates; rescanning repairs history. Snapshot/history publication is atomic and rewritten branches remove stale cached commits.
 - Add VM/interpreter regressions and escape invalid date fallback text.
 
-## Unreleased — discovery controls
+### Discovery and layout
 
+- Truncate long branch labels and use a Tabler chevron for hidden repositories.
 - Keep detail-page Rescan, Copy Path, and Copy Status buttons inside their card with compact wrapping controls.
 - Persist hidden discovery results; hide one or selected repositories and restore them from the Hidden repositories list.
 - Prevent archived tracked repositories from reappearing as new discoveries. Migrate existing databases to schema v3 without changing tracked repositories.
 
 
-## Unreleased — hardening fixes
+### Hardening
 
 - Resolve R01–R10 from the November 9 audit: consistent binary backups, atomic imports/scans, bounded discovery with visible truncation, rename/detached correctness, typed JSON and loopback Host validation.
 - Align dashboard settings, status categories and alert totals; bound activity feeds and use indexed latest-snapshot lookups.
 - Add health `--summary` and `--output=<path>` options, dual-runtime regression gates, frontend behavior tests, and corrected operational documentation.
 
 
-## Unreleased
 
-### FEATURE
+### Features
 - Agent-oriented `review` command with optional fresh bulk scans
 - JSON output for list, single-scan, bulk-scan, and review workflows
 - Dirty-only and attention-only repository filters
@@ -30,7 +32,7 @@
 - `doctor` and `version` commands with machine-readable JSON contracts
 - Linux and macOS CI with checksum-verified Kujo installation
 
-### TWEAK
+### Improvements
 - Detailed human-readable repository health output
 - Stable automation exit codes for operational errors, invalid usage, and attention findings
 - CLI bulk scans now persist scan-run summaries like the HTTP bulk-scan endpoint
@@ -39,12 +41,16 @@
 - Bounded recursive discovery and bulk API collections
 - Root cleanup, MIT license, corrected documentation links, and a prioritized follow-up review
 
-### SECURITY
+### Security
 - Exact same-origin enforcement for browser mutations while retaining origin-less local automation
 - JSON content-type enforcement and a 1 MiB mutation-body limit
 - Read-only Git inspection disables repository-configured filesystem-monitor helpers and optional index locking
 - Repository boolean flags are normalized before SQL construction
 - Detail-view copy actions no longer interpolate repository paths into inline JavaScript
+
+### Known issues
+
+- Four review findings remain open: quoted filename fidelity, atomic settings saves on write failure, discovery limits consumed by hidden/tracked repositories, and scan consistency during a concurrent branch switch. See [the pass-3 review](audits/repository-hardening-2026-11-12-pass3.md), R16–R19. This release does not claim to fix these findings.
 
 ## [0.4.0] — 2026-08-25
 

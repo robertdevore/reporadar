@@ -1,6 +1,6 @@
 # Roadmap
 
-## Unreleased
+## v0.5.0 (Current release)
 - [x] Agent-oriented ecosystem review command
 - [x] Machine-readable JSON health reports
 - [x] Dirty and attention filters
@@ -35,7 +35,7 @@
 - [x] Commit hash and remote detail presentation refinements
 - [x] Sharper visual system with square-edged UI
 
-## v0.4.0 (Current checkpoint)
+## Remaining roadmap
 - [ ] Write action endpoints (stage, commit, push, pull)
 - [x] Styled confirmation modal for repository removal
 - [ ] Audit log for write actions
@@ -58,4 +58,4 @@
 - No authentication; the HTTP server must remain localhost-only
 - No cloud sync (by design)
 - Requires Git to be installed separately
-- Kujo v1.0.0+ required; may not work with older versions
+- Kujo v1.9.0 is the tested runtime

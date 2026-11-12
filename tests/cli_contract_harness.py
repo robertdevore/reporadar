@@ -53,7 +53,7 @@ def main() -> None:
         assert version.returncode == 0, version.stdout + version.stderr
         version_data = json_result(version)
         assert version_data["app"] == "reporadar"
-        assert version_data["version"] == "0.4.0"
+        assert version_data["version"] == "0.5.0"
 
         doctor = run_cli(db_path, "doctor", "--json")
         assert doctor.returncode == 0, doctor.stdout + doctor.stderr
