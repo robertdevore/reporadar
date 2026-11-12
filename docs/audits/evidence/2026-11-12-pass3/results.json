@@ -1,0 +1,110 @@
+[
+  {
+    "runtime": "vm",
+    "R16": {
+      "expected_paths": [
+        "café.txt",
+        "line\nbreak.txt",
+        "quote\".txt",
+        "space-end "
+      ],
+      "actual_paths": [
+        "\"caf\\303\\251.txt\"",
+        "\"line\\nbreak.txt\"",
+        "\"quote\\\".txt\"",
+        "\"space-end \""
+      ],
+      "count": 4
+    },
+    "R17": {
+      "http_status": 500,
+      "persisted_after_failed_request": [
+        [
+          "audit_a",
+          "a"
+        ]
+      ]
+    },
+    "R18": {
+      "repeated_parent_scan": [
+        {
+          "truncated": true,
+          "total_found": 1000,
+          "excluded_count": 1000,
+          "entries_examined": 3002,
+          "new_repos": []
+        },
+        {
+          "truncated": true,
+          "total_found": 1000,
+          "excluded_count": 1000,
+          "entries_examined": 3002,
+          "new_repos": []
+        }
+      ],
+      "narrowed_last_repository_found": true
+    },
+    "R19": {
+      "success": true,
+      "reported_branch": "master",
+      "actual_branch": "audit-other",
+      "latest_commit_matches_other_branch": true,
+      "persisted_branch": "master",
+      "persisted_scan_error": ""
+    }
+  },
+  {
+    "runtime": "interpreter",
+    "R16": {
+      "expected_paths": [
+        "café.txt",
+        "line\nbreak.txt",
+        "quote\".txt",
+        "space-end "
+      ],
+      "actual_paths": [
+        "\"caf\\303\\251.txt\"",
+        "\"line\\nbreak.txt\"",
+        "\"quote\\\".txt\"",
+        "\"space-end \""
+      ],
+      "count": 4
+    },
+    "R17": {
+      "http_status": 500,
+      "persisted_after_failed_request": [
+        [
+          "audit_a",
+          "a"
+        ]
+      ]
+    },
+    "R18": {
+      "repeated_parent_scan": [
+        {
+          "truncated": true,
+          "total_found": 1000,
+          "excluded_count": 1000,
+          "entries_examined": 3002,
+          "new_repos": []
+        },
+        {
+          "truncated": true,
+          "total_found": 1000,
+          "excluded_count": 1000,
+          "entries_examined": 3002,
+          "new_repos": []
+        }
+      ],
+      "narrowed_last_repository_found": true
+    },
+    "R19": {
+      "success": true,
+      "reported_branch": "master",
+      "actual_branch": "audit-other",
+      "latest_commit_matches_other_branch": true,
+      "persisted_branch": "master",
+      "persisted_scan_error": ""
+    }
+  }
+]
