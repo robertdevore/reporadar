@@ -89,3 +89,8 @@ test "parse_git_status clean repo" {
 - GitHub Actions runs source checks, dual-runtime Kujo tests, CLI contracts, a live server smoke test, and JavaScript syntax on Linux and macOS.
 
 Performance benchmarks for 30, 100, and 500 repository registries remain a documented follow-up rather than an unsubstantiated performance claim.
+
+
+### Metadata/history regressions
+
+Run `python3 tests/metadata_harness.py` with Kujo 1.9.0 first on PATH. CI runs this on Linux/macOS. Both VM and interpreter exercise real Git configuration overrides, delimiter-bearing authors/subjects, fake credential remotes, legacy schema migration/rollback, UTC offset/day/window behavior, >20 commits, explicit collection truncation/shallow status, rewritten history, atomic failure recovery and HTTP activity/detail/export/backup contracts. `node tests/frontend_harness.js` also checks incomplete-history notices and safe invalid-date rendering. The history collection cap is a documented product bound, not a performance benchmark; change it with the extra-record detection and boundary tests together, never by removing the incomplete signal.

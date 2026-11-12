@@ -1,5 +1,11 @@
 # Changelog
 
+## Metadata hardening — 2026-11-12
+
+- Resolve R11–R15: deterministic untracked status, redacted remote userinfo, NUL-framed commits, UTC activity dates, and bounded history collection with visible completeness.
+- Schema v4 migrates cached remotes/dates; rescanning repairs history. Snapshot/history publication is atomic and rewritten branches remove stale cached commits.
+- Add VM/interpreter regressions and escape invalid date fallback text.
+
 ## Unreleased — discovery controls
 
 - Keep detail-page Rescan, Copy Path, and Copy Status buttons inside their card with compact wrapping controls.

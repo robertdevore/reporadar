@@ -44,7 +44,7 @@ RepoRadar is a **local-first** Git repository dashboard built in the **Kujo prog
 1. User adds repo via CLI or API → validated as Git repo → stored in `repos` table
 2. Scan triggered → `scanner.kujo` runs safe Git commands → parses output → stored in `repo_status_snapshots`
 3. Dashboard loads → API returns joined query of repos + latest snapshot → frontend renders
-4. Activity view → `git log --since` collects commits → stored in `repo_commits` → queried by time window
+4. Scan → bounded reachable-HEAD history collection → snapshot and commit-cache replacement in one transaction → activity queries the UTC cache with explicit completeness metadata. Detail display remains limited to 20 commits.
 
 ## Database Schema
 
@@ -54,9 +54,10 @@ RepoRadar is a **local-first** Git repository dashboard built in the **Kujo prog
 - `repo_commits` — Collected commit records
 - `scan_runs` — Bulk scan logs
 - `settings` — Key-value configuration
+- `discovery_exclusions` — Persisted hidden discovery paths
 - `schema_version` — Migration tracking
 
-Database initialization enables foreign keys, a five-second busy timeout, WAL mode, and normal synchronous durability. Schema v2 adds indexes for latest-snapshot and date-first activity access and performs one-time commit deduplication before enforcing uniqueness.
+Database initialization enables foreign keys, a five-second busy timeout, WAL mode, and normal synchronous durability. Schema v4 adds history completeness metadata and migrates retained timestamps/remotes. Existing latest-snapshot/date indexes and unique commit identity remain. See DEVELOPMENT.md for cache, migration and history-limit contracts.
 
 ## Safe Git Commands Used
 
@@ -64,7 +65,7 @@ All Git operations use safe, read-only subcommands prefixed by `GIT_OPTIONAL_LOC
 - `git rev-parse --is-inside-work-tree`
 - `git rev-parse --show-toplevel`
 - `git branch --show-current`
-- `git status --porcelain=v1 --branch`
+- `git status --porcelain=v1 --branch --untracked-files=all --ignore-submodules=none`
 - `git log --pretty=format:...`
 - `git remote get-url origin`
 - `git rev-parse --abbrev-ref --symbolic-full-name @{u}`

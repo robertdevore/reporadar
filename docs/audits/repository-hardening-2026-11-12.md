@@ -1,5 +1,7 @@
 # RepoRadar hardening review — 2026-11-12
 
+> Fix-mode completion: R11–R15 are resolved. See the final section for implementation, verification and compatibility limits. Original review evidence is preserved below.
+
 ## Repository and scope
 
 - **Review mode**, per bare skill invocation. No implementation fixes or live registry mutations.
@@ -96,3 +98,52 @@ git diff --check
 ```
 
 Baseline PASS; probe execution PASS as evidence collection, with intentionally defective results preserved in [results.json](evidence/2026-11-12/results.json). API checks returned `0` / `v1.9.0`. Whitespace check PASS. The probe does not contact remotes and does not access the live RepoRadar database. No actual credential or browser exploit was tested. Follow-up implementation remains open by mode choice.
+
+## Fix-mode completion — 2026-11-12
+
+User explicitly authorized implementation of R11–R15, verification, commits/push and local restart. Starting SHA: `818037bce896d8025aa78847a96ab58f11b080f7`; verified implementation SHA: `9e80d07` (the subsequent documentation commit contains this receipt). The review/baseline above remains historical evidence. Phases 0–16 supplied the bounded audit; this pass completes 17–18 for all five confirmed findings. No related repository implementation was modified.
+
+| Finding | Resolution | Regression evidence | Status |
+|---|---|---|---|
+| R11 | Explicit `--untracked-files=all --ignore-submodules=none`; count actual untracked files within directories | Real Git local/global `status.showUntrackedFiles=no` fixture still reports two nested untracked files and dirty state | Resolved |
+| R12 | Shared remote-userinfo redaction at scanner, persistence and CLI report boundaries; atomic schema-v4 cleanup of retained snapshots | HTTPS password/token/encoded-userinfo and SSH URI cases; SCP/local path preservation; unchanged Git configuration; redacted API export and SQLite backup; failed migration rollback | Resolved for URL userinfo; external old artifacts are not rewritten |
+| R13 | Production Git records use five NUL-framed fields and strict ISO author dates; cached records refresh rather than ignoring existing hashes | Real delimiter-bearing author and subject preserved; schema migration marks history incomplete; rescan replaces corrupted cached metadata; malformed date fallback text escaped | Resolved |
+| R14 | UTC `YYYY-MM-DDTHH:MM:SSZ` persistence, legacy-offset migration and UTC indexed cutoff comparisons | Positive/negative offsets crossing a UTC date boundary, opposite-offset window inclusion/exclusion, non-null HTTP day buckets, idempotent/rollback migration | Resolved |
+| R15 | Production CLI/HTTP scans collect bounded reachable-HEAD history, independently of 20-row detail display; atomic cache replacement removes unreachable history; completeness in API/CLI/UI | 27 commits collected instead of 20; detail remains 20; deliberate small-limit and shallow-clone incompleteness; rewrite removes five unreachable commits; failure preserves previous cache and snapshot | Resolved with explicit bounded-history contract |
+
+### Design, compatibility and migration
+
+- New `src/metadata.kujo` centralizes redaction/date normalization without adding dependencies. `scan_and_store` unifies existing CLI/HTTP scan publication and keeps Git work outside the SQLite transaction. HEAD movement between initial metadata and history collection returns an actionable scan error.
+- Schema v4 adds `history_complete`, `history_error`, `history_scanned_at` to repositories. Existing registry metadata, archives and discovery exclusions survive. A failed metadata migration does not record v4; retries are safe. Valid legacy dates normalize; invalid dates become empty and are excluded from activity. Fresh scans replace corrupted commit-cache fields and write corrected latest snapshots. Historical author/message snapshot fields cannot be reconstructed by migration alone and are preserved as historical records.
+- Public changes are additive completeness fields in repo/scan/activity responses and CLI summaries, redacted URI userinfo, corrected status counts and UTC timestamps. Health JSON schema remains v1; CLI flags/exit policy, configuration/environment and export/import formats remain supported. Date representation changes intentionally correct broken comparisons; consumers should parse ISO timestamps rather than rely on the old Git display format.
+- Commit cache now represents the last scanned reachable HEAD, not an accumulation of every branch ever visited. Branch switches and rewrites intentionally remove unreachable cached commits. The latest 10,000 reachable records are retained; an extra fetched record identifies truncation. Shallow repositories also report incomplete. Partial activity is visibly labeled and available in structured output. Raising/removing this bound requires a deliberate resource/completeness design, not silent truncation.
+- URI userinfo cleanup does not rewrite Git remotes or external historical backups/reports. Secure-delete and a WAL checkpoint reduce remnants in the current database; checkpoint cleanup can be delayed by an external reader. Old backups must be retired/replaced independently. There was no observed real credential leak, and no secret was collected for testing.
+- Invalid-date HTML escaping closes the identified rendering sink without claiming a previously demonstrated end-to-end XSS exploit.
+
+### Verification and measurements
+
+The fresh pre-edit baseline passed Kujo tests plus CLI/server/hardening/frontend harnesses. After implementation, all nine command groups in [checks.json](evidence/2026-11-12-fix/checks.json) passed; full logs are retained beside it. Metadata/history tests run both VM and interpreter; existing server/hardening tests do likewise. After final error-message/fallback refinements, Kujo tests and the metadata/frontend harnesses passed again (`final-metadata.log`, `final-frontend.log`). CI gates the new harness on Linux/macOS.
+
+Exact final verification commands, with dedicated Kujo 1.9.0 first on PATH:
+
+```sh
+for source in src/*.kujo; do kujo check "$source" || exit; done
+kujo test --runtime dual
+python3 tests/cli_contract_harness.py
+python3 tests/server_smoke_harness.py
+python3 tests/hardening_harness.py
+python3 tests/metadata_harness.py
+node tests/frontend_harness.js
+for source in static/*.js; do node --check "$source" || exit; done
+git diff --check
+```
+
+An intermediate CLI harness failure was its expected schema-v3 assertion; it was updated to assert the required v4 contract, then passed. Test-server shutdown now uses the same terminate/kill fallback as existing harnesses; no product assertion was weakened. No baseline failure remains.
+
+Supported impact: the 27-commit fixture now stores all 27 rather than 20 while the detail response remains bounded to 20. Config-hidden untracked files now count correctly; Git-format timestamps produce actual daily buckets. No runtime speedup, memory savings, token savings or throughput improvement is claimed. Collection does intentionally perform more useful work; its explicit cap and completeness metadata are the resource contract. Existing concise CLI summary/output-file modes remain.
+
+### Operational handoff and remaining scope
+
+The local schema-v3 database was backed up using SQLite's consistent backup API into a private mode-0600 file before migration; integrity check passed. `doctor --json` confirmed schema v4 and all 167 active repositories (204 including archives). Local history refresh and startup use the dedicated Kujo 1.9.0 runtime. Local paths and full scan output belong in the private Strata handoff, not committed evidence.
+
+No open item remains among R11–R15. Earlier unmeasured sustained concurrency, cancellation, discovery continuation and Windows-native concerns remain outside this fix scope; no new cross-repository defect was established. No new SignalBox capture is warranted for these completed fixes. Existing review captures are historical evidence; their resolution is recorded in Strata rather than duplicate completion captures.

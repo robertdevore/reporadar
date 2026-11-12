@@ -58,12 +58,12 @@ Leave this setting disabled for fully offline/local-only operation or environmen
 ## Data Storage
 
 - SQLite database at `~/.reporadar.db` (configurable via `REPORADAR_DB`)
-- No credentials or tokens stored
+- URI userinfo (including HTTPS tokens/passwords) is removed from remote URLs before persistence and reporting; SCP-style SSH usernames remain. Arbitrary repository content, URL paths/query strings and user-entered notes are not a general-purpose secret-redaction surface.
 - Commit messages and repo paths are the most sensitive data stored
 - Connections enable foreign-key enforcement, a 5-second busy timeout, WAL journaling, and normal synchronous durability
 - Indexed latest-snapshot and date-first activity queries avoid repeated full-history scans
 - Scan snapshots and file-change rows are trimmed to the newest 250 snapshots per repository to keep long-lived registries bounded
-- Database can be backed up and restored via Settings page
+- Settings downloads a database backup; binary restoration is offline, as described below.
 
 ## Frontend
 
@@ -90,3 +90,10 @@ JSON mutations reject malformed JSON and wrong container/field types with struct
 `GET /api/export/db` uses SQLite `VACUUM INTO` to create a consistent snapshot including committed WAL data. The snapshot lives in a private temporary directory, is returned as binary SQLite data, and is removed after reading. A failed backup is logged and returns a structured error. Backups contain local paths and metadata; store them accordingly.
 
 The JSON importer accepts registry/settings exports, not SQLite files. To restore a binary backup, stop RepoRadar and any other users of its database, preserve the existing database together with its `-wal` and `-shm` sidecars, then place the downloaded file at the configured `REPORADAR_DB` path without old sidecars. Restart RepoRadar and run `doctor --json`. Do not replace a live database. The regression harness verifies backup integrity and recovery of a committed WAL marker using disposable files.
+
+
+### Remote metadata cleanup
+
+Schema v4 redacts URL userinfo in existing snapshot rows in a transaction, with secure-delete enabled on application connections, then requests WAL truncation. A busy external database reader can delay checkpoint cleanup. Existing backups, JSON exports, logs and copied reports remain outside the migration: replace or securely retire affected artifacts, and rotate any credential that was shared. RepoRadar never rewrites a repository's Git remote. No real credential exposure is inferred from the synthetic regression fixture.
+
+Scans explicitly include all untracked files and submodule changes regardless of repository/global status preferences. Commit fields are NUL-framed, and invalid date fallback text is HTML-escaped in detail/activity views.
