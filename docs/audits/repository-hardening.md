@@ -1,5 +1,7 @@
 # RepoRadar hardening review — 2026-11-09
 
+Latest review: [2026-11-12 — additional findings R11–R15](repository-hardening-2026-11-12.md).
+
 > **Fix-mode update, 2026-11-09:** R01–R10 below are resolved by the implementation and regression gates documented in the final section. The original review and baseline artifacts are preserved as historical evidence.
 
 

@@ -1,0 +1,37 @@
+[
+  {
+    "command": "for source in src/*.kujo; do kujo check \"$source\" || exit; done",
+    "exit": 0,
+    "seconds": 0.2
+  },
+  {
+    "command": "kujo test --runtime dual",
+    "exit": 0,
+    "seconds": 0.15
+  },
+  {
+    "command": "python3 tests/cli_contract_harness.py",
+    "exit": 0,
+    "seconds": 1.32
+  },
+  {
+    "command": "python3 tests/server_smoke_harness.py",
+    "exit": 0,
+    "seconds": 11.09
+  },
+  {
+    "command": "python3 tests/hardening_harness.py",
+    "exit": 0,
+    "seconds": 16.02
+  },
+  {
+    "command": "node tests/frontend_harness.js",
+    "exit": 0,
+    "seconds": 0.13
+  },
+  {
+    "command": "for source in static/*.js; do node --check \"$source\" || exit; done",
+    "exit": 0,
+    "seconds": 0.55
+  }
+]

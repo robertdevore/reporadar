@@ -1,0 +1,8 @@
+[✓] tests/test_scanner.kujo (32.46ms)
+[✓] tests/test_server.kujo (38.05ms)
+[✓] tests/test_integration.kujo (24.97ms)
+[✓] tests/test_registry.kujo (27.25ms)
+
+[✓] Passed 4/4 tests
+[i] Fixture outcomes: passed=4, failed=0, skipped=0, expected_fail=0, runnable=4, discovered=4
+[i] Runtime strategy: dual (vm_primary=4, interpreter_fallback=0)

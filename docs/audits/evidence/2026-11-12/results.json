@@ -1,0 +1,36 @@
+{
+  "untracked_config": {
+    "normal": {
+      "is_clean": 0,
+      "untracked_count": 1
+    },
+    "configured": {
+      "is_clean": 1,
+      "untracked_count": 0
+    }
+  },
+  "remote_retention": "https://fixture-user:FAKE-AUDIT-TOKEN@example.invalid/team/repo.git",
+  "delimiter_author": {
+    "latest_commit_author": "Fixture",
+    "latest_commit_date": "not-a-date",
+    "latest_commit_message": "2026-11-12 07:24:55 -0500---delimiter fixture"
+  },
+  "synthetic_invalid_date_render_NOT_end_to_end": {
+    "exit": 0,
+    "output": "{\"detail\":true,\"activity\":true}",
+    "error": ""
+  },
+  "activity_git_date": {
+    "by_day": [
+      {
+        "count": 1,
+        "day": null
+      }
+    ],
+    "total": 1
+  },
+  "history_capture": {
+    "default": 20,
+    "window": 27
+  }
+}

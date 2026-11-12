@@ -1,0 +1,7 @@
+check passed: src/db.kujo
+check passed: src/health_report.kujo
+check passed: src/main.kujo
+check passed: src/registry.kujo
+check passed: src/scanner.kujo
+check passed: src/server.kujo
+check passed: src/version.kujo
