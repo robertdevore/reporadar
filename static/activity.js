@@ -42,6 +42,9 @@ async function loadActivity(days) {
     document.getElementById('activity-content').classList.remove('hidden');
 
     document.getElementById('sum-total').textContent = data.total_commits;
+    const warning = document.getElementById('history-warning');
+    warning.textContent = data.history_complete ? '' : 'Activity is incomplete for ' + (data.incomplete_repos || []).length + ' repositories. Scan them to refresh history; shallow repositories and those exceeding 10,000 commits show partial totals.';
+    warning.classList.toggle('hidden', data.history_complete === true);
     document.getElementById('sum-active').textContent = data.commits_per_repo ? data.commits_per_repo.length : 0;
     document.getElementById('sum-stale').textContent = data.stale_repos ? data.stale_repos.length : 0;
 
@@ -139,14 +142,14 @@ function formatDate(dateStr) {
   if (!dateStr) return '-';
   try {
     const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
+    if (isNaN(d.getTime())) return escHtml(dateStr);
     const now = new Date();
     const diffMs = now - d;
     const diffDays = Math.floor(diffMs / 86400000);
     if (diffDays < 1) return 'Today';
     if (diffDays < 7) return diffDays + 'd ago';
     return d.toLocaleDateString();
-  } catch (e) { return dateStr; }
+  } catch (e) { return escHtml(dateStr); }
 }
 
 function escHtml(str) {

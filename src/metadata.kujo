@@ -1,0 +1,32 @@
+// Shared metadata boundaries; never alter the repository's own remote configuration.
+export func redact_remote_url(value) {
+	if value == null { return "" }
+	mut url = to_string(value)
+	mut scheme = index_of(url, "://")
+	if scheme < 0 { return url } // SCP-style git@host:path contains a username, not URL userinfo.
+	mut start = scheme + 3
+	mut end = len(url)
+	mut i = start
+	mut at = -1
+	while i < len(url) {
+		mut ch = char_at(url, i)
+		if ch == "/" || ch == "?" || ch == "#" { end = i; break }
+		if ch == "@" { at = i }
+		i = i + 1
+	}
+	if at >= start && at < end { return substring(url, 0, start) + substring(url, at + 1, len(url)) }
+	return url
+}
+
+// Accept old Git ISO and ISO-8601 dates; persist canonical UTC for indexed comparisons.
+export func normalize_commit_date(db, value) {
+	if value == null || value == "" { return "" }
+	mut date = to_string(value)
+	if len(date) == 25 && char_at(date, 19) == " " {
+		date = substring(date, 0, 19) + substring(date, 20, 23) + ":" + substring(date, 23, 25)
+	}
+	mut safe = replace_str(date, "'", "''")
+	mut normalized = db_query(db, "SELECT strftime('%Y-%m-%dT%H:%M:%SZ', '" + safe + "') AS date")[0]["date"]
+	if normalized == null { return "" }
+	return normalized
+}

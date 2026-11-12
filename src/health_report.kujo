@@ -1,6 +1,7 @@
 // health_report.kujo — Agent-friendly repository health reporting helpers
 
 from src.version import app_version
+from src.metadata import redact_remote_url
 
 /// repo_number returns a nullable/missing repository field as an integer default.
 export func repo_number(repo, key, default_value) {
@@ -110,6 +111,7 @@ export func build_review_report(repos, stale_by_id, include_mode, generated_at) 
 		"no_remote": 0,
 		"stale": 0,
 		"security_alerts": 0,
+		"history_incomplete": 0,
 		"changed_files": 0
 	}
 	mut included_repos = []
@@ -123,6 +125,7 @@ export func build_review_report(repos, stale_by_id, include_mode, generated_at) 
 			is_stale = to_int(stale_by_id[repo_id])
 		}
 		mut status = repo_status(repo)
+		if repo_number(repo,"history_complete",0) == 0 { summary["history_incomplete"] = summary["history_incomplete"] + 1 }
 		if status == "unscanned" { is_stale = 0 }
 		mut reasons = repo_attention_reasons(repo, is_stale)
 		mut attention = 0
@@ -160,6 +163,8 @@ export func build_review_report(repos, stale_by_id, include_mode, generated_at) 
 				"attention": attention,
 				"attention_reasons": reasons,
 				"branch": repo_text(repo, "branch", ""),
+				"history_complete": repo_number(repo,"history_complete",0),
+				"history_error": repo_text(repo,"history_error",""),
 				"staged": repo_number(repo, "staged_count", 0),
 				"unstaged": repo_number(repo, "unstaged_count", 0),
 				"untracked": repo_number(repo, "untracked_count", 0),
@@ -168,7 +173,7 @@ export func build_review_report(repos, stale_by_id, include_mode, generated_at) 
 				"behind": behind,
 				"diverged": repo_number(repo, "is_diverged", 0),
 				"has_remote": repo_number(repo, "has_remote", 0),
-				"remote_url": repo_text(repo, "remote_url", ""),
+				"remote_url": redact_remote_url(repo_text(repo, "remote_url", "")),
 				"upstream_branch": repo_text(repo, "upstream_branch", ""),
 				"stale": is_stale,
 				"dependabot_alert_count": alert_count,

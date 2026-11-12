@@ -60,6 +60,9 @@ jobs:
       - name: Run hardening regressions
         run: python3 tests/hardening_harness.py
 
+      - name: Run metadata and history regressions
+        run: python3 tests/metadata_harness.py
+
       - name: Run frontend regressions
         run: node tests/frontend_harness.js
 

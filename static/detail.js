@@ -342,14 +342,14 @@ function formatDate(dateStr) {
   if (!dateStr) return '-';
   try {
     const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
+    if (isNaN(d.getTime())) return escHtml(dateStr);
     const now = new Date();
     const diffMs = now - d;
     const diffDays = Math.floor(diffMs / 86400000);
     if (diffDays < 1) return 'Today';
     if (diffDays < 7) return diffDays + 'd ago';
     return d.toLocaleDateString();
-  } catch (e) { return dateStr; }
+  } catch (e) { return escHtml(dateStr); }
 }
 
 function escHtml(str) {

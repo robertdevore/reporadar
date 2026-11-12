@@ -2,8 +2,8 @@
 // Serves the dashboard UI and provides JSON API endpoints.
 
 from src.db import init_db, get_db_path, get_setting, set_setting, escape_sql
-from src.scanner import validate_git_repo, validate_repo_path, get_canonical_path, scan_repo_with_options, collect_recent_commits
-from src.registry import add_repo, remove_repo, update_repo, get_all_repos, get_repo_by_id, store_scan_result, store_repo_commits, get_repo_file_changes, get_repo_scan_history, get_repo_commits, get_activity_feed, get_activity_total, get_repo_stale_map, get_commits_by_day, get_commit_count_per_repo
+from src.scanner import validate_git_repo, validate_repo_path, get_canonical_path
+from src.registry import add_repo, remove_repo, update_repo, get_all_repos, get_repo_by_id, scan_and_store, get_repo_file_changes, get_repo_scan_history, get_repo_commits, get_activity_feed, get_activity_total, get_repo_stale_map, get_commits_by_day, get_commit_count_per_repo
 from src.version import app_version
 from src.health_report import build_review_report
 
@@ -400,20 +400,8 @@ export func api_scan_repo(req) {
 
 	// Run the scan
 	mut enable_dependabot_alerts = get_setting(db, "enable_dependabot_alerts", "false") == "true"
-	mut scan_result = scan_repo_with_options(repo_path, enable_dependabot_alerts)
-
-	// Store the result
-	mut snapshot_id = 0
-	if scan_result["success"] {
-		snapshot_id = store_scan_result(db, repo_id, scan_result)
-
-		// Collect recent commits
-		mut commits = collect_recent_commits(repo_path, 0)
-		store_repo_commits(db, repo_id, commits)
-	} else {
-		// Store error result
-		store_scan_result(db, repo_id, scan_result)
-	}
+	mut scan_result = scan_and_store(db, repo_id, repo_path, enable_dependabot_alerts)
+	mut snapshot_id = scan_result["snapshot_id"]
 
 	// Return updated repo data
 	mut updated_repo = get_repo_by_id(db, repo_id)
@@ -574,6 +562,8 @@ export func api_activity(req) {
 		"success": true,
 		"days": days,
 		"total_commits": total_commits,
+		"history_complete": len(db_query(db,"SELECT id FROM repos WHERE archived=0 AND history_complete=0")) == 0,
+		"incomplete_repos": db_query(db,"SELECT id, display_name, history_error, history_scanned_at FROM repos WHERE archived=0 AND history_complete=0 ORDER BY id"),
 		"commits_by_day": commits_by_day,
 		"commits_per_repo": commits_per_repo,
 		"most_active": most_active,
@@ -620,12 +610,9 @@ export func api_bulk_scan(req) {
 		i = i + 1
 
 		mut enable_dependabot_alerts = get_setting(db, "enable_dependabot_alerts", "false") == "true"
-		mut scan_result = scan_repo_with_options(repo["path"], enable_dependabot_alerts)
-		store_scan_result(db, repo["id"], scan_result)
+		mut scan_result = scan_and_store(db, repo["id"], repo["path"], enable_dependabot_alerts)
 
 		if scan_result["success"] {
-			mut commits = collect_recent_commits(repo["path"], 0)
-			store_repo_commits(db, repo["id"], commits)
 			results["scanned"] = results["scanned"] + 1
 			if scan_result["is_clean"] == 1 {
 				results["clean"] = results["clean"] + 1

@@ -1,3 +1,5 @@
+from src.metadata import redact_remote_url
+
 // scanner.kujo — RepoRadar Git Scanner
 // Runs safe read-only Git commands and parses their output.
 
@@ -254,7 +256,7 @@ mut staged = 0
 	return result
 }
 
-/// parse_commit_log_line parses the scanner's delimited git log format.
+/// Legacy delimited-record compatibility helper; production scans use NUL records.
 export func parse_commit_log_line(line) {
 	mut parts = split(to_string(line), "---")
 	mut commit = {
@@ -274,39 +276,55 @@ export func parse_commit_log_line(line) {
 	return commit
 }
 
-/// get_latest_commit returns the latest commit info as a dict.
-/// Uses null-safe parsing.
-export func get_latest_commit(repo_path) {
-	mut result = execute_status(git_inspect_prefix(repo_path) + " log -1 --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null")
+/// NUL framing prevents delimiter-bearing authors or subjects shifting fields.
+export func parse_commit_records(output) {
+	mut fields = split(output, parse_json("\"\\u0000\""))
+	if len(fields) > 0 && fields[len(fields)-1] == "" { fields = slice(fields, 0, len(fields)-1) }
+	if len(fields) % 5 != 0 { throw("Invalid Git commit record framing") }
+	mut commits = []
+	mut i = 0
+	while i < len(fields) {
+		if len(fields[i]) != 40 && len(fields[i]) != 64 { throw("Invalid Git commit identity") }
+		if len(fields[i+3]) != 25 { throw("Invalid Git commit timestamp") }
+		commits = push(commits, {"hash":fields[i],"short_hash":fields[i+1],"author":fields[i+2],"date":fields[i+3],"message":fields[i+4]})
+		i = i + 5
+	}
+	return commits
+}
+
+/// Bounded reachable HEAD history. One extra record detects incomplete collection.
+/// A partial history is explicitly reported; callers must never label it complete.
+export func collect_history_report(repo_path, limit) {
+	if limit < 1 || limit > 10000 { throw("History limit must be between 1 and 10000") }
+	mut result = execute_status(git_inspect_prefix(repo_path) + " log -z --no-show-signature --max-count=" + to_string(limit + 1) + " --format=" + shell_quote("%H%x00%h%x00%an%x00%aI%x00%s") + " HEAD --")
 	if !result.success || result.exitcode != 0 {
-		return {
-			"hash": "",
-			"short_hash": "",
-			"author": "",
-			"date": "",
-			"message": ""
+		// An unborn HEAD has no history. Other failures remain errors, not empty success.
+		mut status = execute_status(git_inspect_prefix(repo_path) + " status --porcelain=v1 --branch --untracked-files=no")
+		if status.success && (starts_with(status.stdout, "## No commits yet on ") || starts_with(status.stdout, "## Initial commit on ")) {
+			return {"commits":[],"complete":true,"limit":limit,"error":""}
 		}
+		throw("Could not collect Git commit history")
 	}
+	mut commits = parse_commit_records(result.stdout)
+	mut shallow = execute_status(git_inspect_prefix(repo_path) + " rev-parse --is-shallow-repository")
+	if !shallow.success || shallow.exitcode != 0 { throw("Could not determine history completeness") }
+	mut error = ""
+	if len(commits) > limit { error = "History exceeds the " + to_string(limit) + "-commit collection limit; activity is partial" }
+	if trim(shallow.stdout) == "true" { error = "Shallow repository history is incomplete" }
+	return {"commits":slice(commits,0,limit),"complete":error == "","limit":limit,"error":error}
+}
 
-	mut output = trim(result.stdout)
-	if output == "" {
-		return {
-			"hash": "",
-			"short_hash": "",
-			"author": "",
-			"date": "",
-			"message": ""
-		}
-	}
-
-	return parse_commit_log_line(output)
+export func get_latest_commit(repo_path) {
+	mut commits = collect_history_report(repo_path, 1)["commits"]
+	if len(commits) > 0 { return commits[0] }
+	return {"hash":"","short_hash":"","author":"","date":"","message":""}
 }
 
 /// get_remote_url returns the origin remote URL, or empty string if none.
 export func get_remote_url(repo_path) {
 	mut result = execute_status(git_inspect_prefix(repo_path) + " remote get-url origin 2>/dev/null")
 	if result.success && result.exitcode == 0 {
-		return trim(result.stdout)
+		return redact_remote_url(trim(result.stdout))
 	}
 	return ""
 }
@@ -469,7 +487,7 @@ export func scan_repo_with_options(repo_path, enable_dependabot_alerts) {
 	// Get branch and status via porcelain
 	mut status_output = ""
 	try {
-		mut status_result = execute_status(git_inspect_prefix(repo_path) + " status --porcelain=v1 --branch")
+		mut status_result = execute_status(git_inspect_prefix(repo_path) + " status --porcelain=v1 --branch --untracked-files=all --ignore-submodules=none")
 		if status_result.success && status_result.exitcode == 0 {
 			status_output = status_result.stdout
 		} else {
@@ -502,7 +520,12 @@ export func scan_repo_with_options(repo_path, enable_dependabot_alerts) {
 			mut head_ref = trim(head_result.stdout)
 			if head_ref == "HEAD" {
 				// Truly detached - use commit hash as branch
-				mut commit = get_latest_commit(repo_path)
+				mut commit = null
+				try { commit = get_latest_commit(repo_path) } except err {
+					result["success"] = false
+					result["error"] = "Could not read latest Git commit metadata"
+					return result
+				}
 				result["branch"] = "(detached at " + commit["short_hash"] + ")"
 			} else {
 				result["branch"] = head_ref
@@ -543,7 +566,12 @@ export func scan_repo_with_options(repo_path, enable_dependabot_alerts) {
 	}
 
 	// Get latest commit
-	mut commit = get_latest_commit(repo_path)
+	mut commit = null
+	try { commit = get_latest_commit(repo_path) } except err {
+		result["success"] = false
+		result["error"] = "Could not read latest Git commit metadata"
+		return result
+	}
 	result["latest_commit_hash"] = commit["hash"]
 	result["latest_commit_short_hash"] = commit["short_hash"]
 	result["latest_commit_author"] = commit["author"]
@@ -553,41 +581,11 @@ export func scan_repo_with_options(repo_path, enable_dependabot_alerts) {
 	return result
 }
 
-/// collect_recent_commits fetches recent commits from a repo.
-/// days: number of days to look back (or 0 for last 20 commits).
+/// Legacy array helper: callers needing completeness use collect_history_report.
+/// The historical 20-row default remains for detail consumers, not production scans.
 export func collect_recent_commits(repo_path, days) {
-	mut commits = []
-	mut command = ""
-
-	if days > 0 {
-		command = git_inspect_prefix(repo_path) + " log --since=\"" + to_string(days) + " days ago\" --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null"
-	} else {
-		command = git_inspect_prefix(repo_path) + " log -20 --pretty=format:%H---%h---%an---%ad---%s --date=iso 2>/dev/null"
-	}
-
-	mut result = execute_status(command)
-	if !result.success || result.exitcode != 0 {
-		return commits
-	}
-
-	mut output = trim(result.stdout)
-	if output == "" {
-		return commits
-	}
-
-	mut lines = split(output, "\n")
-	mut i = 0
-	while i < len(lines) {
-		mut line = lines[i]
-		i = i + 1
-		if line == "" {
-			continue
-		}
-
-		if len(split(line, "---")) >= 5 {
-			commits = push(commits, parse_commit_log_line(line))
-		}
-	}
-
-	return commits
+	if days <= 0 { return collect_history_report(repo_path,20)["commits"] }
+	mut result = execute_status(git_inspect_prefix(repo_path) + " log -z --no-show-signature --since=" + shell_quote(to_string(days) + " days ago") + " --format=" + shell_quote("%H%x00%h%x00%an%x00%aI%x00%s") + " HEAD --")
+	if !result.success || result.exitcode != 0 { throw("Could not collect Git commit history") }
+	return parse_commit_records(result.stdout)
 }

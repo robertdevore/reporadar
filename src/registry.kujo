@@ -1,7 +1,8 @@
 // registry.kujo — RepoRadar Repo Registry CRUD Operations
 
 from src.db import escape_sql
-from src.scanner import validate_repo_path, validate_git_repo, get_canonical_path
+from src.metadata import redact_remote_url, normalize_commit_date
+from src.scanner import validate_repo_path, validate_git_repo, get_canonical_path, scan_repo_with_options, collect_history_report
 
 /// normalize_binary_flag converts dynamic API/import values to SQLite-safe 0/1.
 export func normalize_binary_flag(value) {
@@ -156,13 +157,13 @@ export func store_scan_result(db, repo_id, scan_data) {
 // Caller owns the transaction; do not publish partially populated snapshots.
 export func write_scan_result(db, repo_id, scan_data) {
 	mut safe_branch = escape_sql(scan_data["branch"])
-	mut safe_remote = escape_sql(scan_data["remote_url"])
+	mut safe_remote = escape_sql(redact_remote_url(scan_data["remote_url"]))
 	mut safe_upstream = escape_sql(scan_data["upstream_branch"])
 	mut safe_hash = escape_sql(scan_data["latest_commit_hash"])
 	mut safe_short = escape_sql(scan_data["latest_commit_short_hash"])
 	mut safe_msg = escape_sql(scan_data["latest_commit_message"])
 	mut safe_author = escape_sql(scan_data["latest_commit_author"])
-	mut safe_date = escape_sql(scan_data["latest_commit_date"])
+	mut safe_date = escape_sql(normalize_commit_date(db,scan_data["latest_commit_date"]))
 	mut safe_error = escape_sql(scan_data["error"])
 	mut dependabot_alert_count = -1
 	if has_key(scan_data, "dependabot_alert_count") == 1 {
@@ -234,10 +235,10 @@ export func store_repo_commits(db, repo_id, commits) {
 		mut safe_hash = escape_sql(c["hash"])
 		mut safe_short = escape_sql(c["short_hash"])
 		mut safe_author = escape_sql(c["author"])
-		mut safe_date = escape_sql(c["date"])
+		mut safe_date = escape_sql(normalize_commit_date(db,c["date"]))
 		mut safe_msg = escape_sql(c["message"])
 
-		db_execute(db, "INSERT OR IGNORE INTO repo_commits (repo_id, commit_hash, short_hash, author, date, message) VALUES (" + to_string(repo_id) + ", '" + safe_hash + "', '" + safe_short + "', '" + safe_author + "', '" + safe_date + "', '" + safe_msg + "')")
+		db_execute(db, "INSERT INTO repo_commits (repo_id, commit_hash, short_hash, author, date, message) VALUES (" + to_string(repo_id) + ", '" + safe_hash + "', '" + safe_short + "', '" + safe_author + "', '" + safe_date + "', '" + safe_msg + "') ON CONFLICT(repo_id, commit_hash) DO UPDATE SET short_hash=excluded.short_hash, author=excluded.author, date=excluded.date, message=excluded.message")
 	}
 }
 
@@ -249,23 +250,58 @@ export func get_repo_commits(db, repo_id, limit) {
 
 /// get_commits_in_window returns commits across all repos within a time window.
 export func get_commits_in_window(db, days) {
-	return db_query(db, "SELECT rc.*, r.name as repo_name, r.display_name as repo_display_name, r.path as repo_path FROM repo_commits rc INNER JOIN repos r ON rc.repo_id = r.id WHERE rc.date >= datetime('now', '-" + to_string(days) + " days') AND r.archived = 0 ORDER BY rc.date DESC")
+	return db_query(db, "SELECT rc.*, r.name as repo_name, r.display_name as repo_display_name, r.path as repo_path FROM repo_commits rc INNER JOIN repos r ON rc.repo_id = r.id WHERE rc.date >= strftime('%Y-%m-%dT%H:%M:%SZ','now', '-" + to_string(days) + " days') AND r.archived = 0 ORDER BY rc.date DESC")
 }
 
 /// get_commits_by_day returns commit counts grouped by day for all repos.
 export func get_commits_by_day(db, days) {
-	return db_query(db, "SELECT date(rc.date) as day, COUNT(*) as count FROM repo_commits rc INNER JOIN repos r ON rc.repo_id = r.id WHERE rc.date >= datetime('now', '-" + to_string(days) + " days') AND r.archived = 0 GROUP BY date(rc.date) ORDER BY day ASC")
+	return db_query(db, "SELECT date(rc.date) as day, COUNT(*) as count FROM repo_commits rc INNER JOIN repos r ON rc.repo_id = r.id WHERE rc.date >= strftime('%Y-%m-%dT%H:%M:%SZ','now', '-" + to_string(days) + " days') AND r.archived = 0 GROUP BY date(rc.date) ORDER BY day ASC")
 }
 
 /// get_commit_count_per_repo returns commit counts per repo for a time window.
 export func get_commit_count_per_repo(db, days) {
-	return db_query(db, "SELECT rc.repo_id, r.name as repo_name, r.display_name, r.path, COUNT(*) as commit_count FROM repo_commits rc INNER JOIN repos r ON rc.repo_id = r.id WHERE rc.date >= datetime('now', '-" + to_string(days) + " days') AND r.archived = 0 GROUP BY rc.repo_id ORDER BY commit_count DESC")
+	return db_query(db, "SELECT rc.repo_id, r.name as repo_name, r.display_name, r.path, COUNT(*) as commit_count FROM repo_commits rc INNER JOIN repos r ON rc.repo_id = r.id WHERE rc.date >= strftime('%Y-%m-%dT%H:%M:%SZ','now', '-" + to_string(days) + " days') AND r.archived = 0 GROUP BY rc.repo_id ORDER BY commit_count DESC")
 }
 
 /// Bounded activity feed and independent total; do not materialize the full history.
 export func get_activity_feed(db, days) {
-	return db_query(db, "SELECT rc.*, r.name as repo_name, r.display_name as repo_display_name, r.path as repo_path FROM repo_commits rc JOIN repos r ON rc.repo_id = r.id WHERE r.archived = 0 AND rc.date >= datetime('now', '-" + to_string(days) + " days') ORDER BY rc.date DESC, rc.id DESC LIMIT 50")
+	return db_query(db, "SELECT rc.*, r.name as repo_name, r.display_name as repo_display_name, r.path as repo_path FROM repo_commits rc JOIN repos r ON rc.repo_id = r.id WHERE r.archived = 0 AND rc.date >= strftime('%Y-%m-%dT%H:%M:%SZ','now', '-" + to_string(days) + " days') ORDER BY rc.date DESC, rc.id DESC LIMIT 50")
 }
 export func get_activity_total(db, days) {
-	return db_query(db, "SELECT COUNT(*) as total FROM repo_commits rc JOIN repos r ON rc.repo_id = r.id WHERE r.archived = 0 AND rc.date >= datetime('now', '-" + to_string(days) + " days')")[0]["total"]
+	return db_query(db, "SELECT COUNT(*) as total FROM repo_commits rc JOIN repos r ON rc.repo_id = r.id WHERE r.archived = 0 AND rc.date >= strftime('%Y-%m-%dT%H:%M:%SZ','now', '-" + to_string(days) + " days')")[0]["total"]
+}
+
+/// All production scan entrypoints share atomic snapshot/history publication.
+/// Git commands run before the write transaction. HEAD history replaces the cache,
+/// so force-pushes, branch switches and repaired metadata cannot leave ghost commits.
+export func scan_and_store(db, repo_id, path, enable_alerts) {
+	mut scan = scan_repo_with_options(path, enable_alerts)
+	mut history = {"commits":[],"complete":false,"limit":10000}
+	if scan["success"] {
+		try {
+			history = collect_history_report(path,10000)
+			if len(history["commits"]) > 0 && history["commits"][0]["hash"] != scan["latest_commit_hash"] { throw("HEAD changed during scan") }
+		} except err {
+			scan["success"] = false
+			scan["error"] = "History collection failed: " + to_string(err) + "; retry the scan"
+		}
+	}
+	db_begin_immediate(db)
+	try {
+		mut snapshot_id = write_scan_result(db,repo_id,scan)
+		mut complete = 0
+		mut error = scan["error"]
+		if scan["success"] {
+			db_execute(db,"DELETE FROM repo_commits WHERE repo_id=" + to_string(repo_id))
+			store_repo_commits(db,repo_id,history["commits"])
+			if history["complete"] { complete = 1; error = "" }
+			else { error = history["error"] }
+		}
+		db_execute(db,"UPDATE repos SET history_complete=" + to_string(complete) + ", history_error='" + escape_sql(error) + "', history_scanned_at=datetime('now') WHERE id=" + to_string(repo_id))
+		db_commit(db)
+		scan["snapshot_id"] = snapshot_id
+		scan["history_complete"] = complete
+		scan["history_error"] = error
+		return scan
+	} except err { db_rollback(db); throw(err) }
 }

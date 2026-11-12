@@ -2,8 +2,7 @@
 // Usage: kujo run src/main.kujo [command] [options]
 
 from src.server import start_server, discover_report
-from src.scanner import scan_repo_with_options, collect_recent_commits
-from src.registry import add_repo, remove_repo, get_all_repos, get_repo_by_id, get_repo_stale_map, store_scan_result, store_repo_commits
+from src.registry import add_repo, remove_repo, get_all_repos, get_repo_by_id, get_repo_stale_map, scan_and_store
 from src.db import init_db, init_db_with_options, get_setting, get_db_path
 from src.health_report import build_review_report, report_exit_code
 from src.version import app_version
@@ -199,13 +198,10 @@ export func run_bulk_scan(db, quiet) {
 		i = i + 1
 		mut name = get_default(repo, "display_name", get_default(repo, "name", "?"))
 		if quiet == false { print("  [" + to_string(i) + "/" + to_string(len(repos)) + "] " + name + " ...") }
-		mut scan_result = scan_repo_with_options(repo["path"], enable_dependabot_alerts)
-		store_scan_result(db, repo["id"], scan_result)
+		mut scan_result = scan_and_store(db, repo["id"], repo["path"], enable_dependabot_alerts)
 		if scan_result["success"] {
 			result["succeeded"] = result["succeeded"] + 1
 			if scan_result["is_clean"] == 1 { result["clean"] = result["clean"] + 1 } else { result["dirty"] = result["dirty"] + 1 }
-			mut commits = collect_recent_commits(repo["path"], 0)
-			store_repo_commits(db, repo["id"], commits)
 		} else {
 			result["errors"] = result["errors"] + 1
 			if quiet == false { print("    Error: " + scan_result["error"]) }
@@ -245,12 +241,7 @@ export func cmd_scan(repo_id_str, argv) {
 	if repo == null { emit_cli_error(json_mode, "repo not found", 1); return 1 }
 	if json_mode == false { print("Scanning: " + repo["path"] + " ...") }
 	mut enable_dependabot_alerts = get_setting(db, "enable_dependabot_alerts", "false") == "true"
-	mut scan_result = scan_repo_with_options(repo["path"], enable_dependabot_alerts)
-	store_scan_result(db, repo_id, scan_result)
-	if scan_result["success"] {
-		mut commits = collect_recent_commits(repo["path"], 0)
-		store_repo_commits(db, repo_id, commits)
-	}
+	mut scan_result = scan_and_store(db, repo_id, repo["path"], enable_dependabot_alerts)
 	mut fresh_repo = get_repo_by_id(db, repo_id)
 	mut stale_map = get_repo_stale_map(db, parse_int(get_setting(db, "stale_threshold_days", "14")))
 	mut report = build_review_report([fresh_repo], stale_map, "all", current_timestamp(db))

@@ -71,7 +71,7 @@ print(to_json({"failed":failed,"snapshots":db_query(db,"SELECT COUNT(*) AS n FRO
         # Simulate an established v2 registry: startup migrates without losing settings.
         with sqlite3.connect(temp / 'test.db') as migration:
             migration.execute('DROP TABLE discovery_exclusions')
-            migration.execute('DELETE FROM schema_version WHERE version=3')
+            migration.execute('DELETE FROM schema_version WHERE version>=3')
             migration.execute('INSERT OR IGNORE INTO schema_version(version) VALUES (2)')
         port = free_port()
         def request(path, method='GET', payload=None, raw=None, headers=None):

@@ -75,3 +75,27 @@ vm.runInContext('loadActivity = days => record(days)', activity);
   assert.match(element('excluded-list').innerHTML,/No hidden/);
   console.log('Discovery hide and restore frontend regressions passed');
 })().catch(err => { console.error(err); process.exitCode=1; });
+
+// Invalid cached dates must stay text even before the next repairing scan.
+for (const file of ['detail', 'activity']) {
+  const markup = '<img src=x onerror="fixture()">';
+  const sandbox = vm.createContext({document:{addEventListener(){}},window:{location:{search:'?id=1'}},URLSearchParams,Date});
+  vm.runInContext(fs.readFileSync('static/'+file+'.js','utf8'),sandbox);
+  sandbox.dateFixture=markup;
+  assert.equal(vm.runInContext('formatDate(dateFixture)',sandbox).includes('<img'),false);
+}
+
+(async () => {
+  const elements = new Map();
+  const el = id => {
+    if (!elements.has(id)) elements.set(id,{textContent:'',classList:{add(){},remove(){},toggle(name,value){this.hidden=value;}}});
+    return elements.get(id);
+  };
+  const sandbox=vm.createContext({document:{addEventListener(){},getElementById:el},fetch:async()=>({ok:true,json:async()=>({total_commits:27,history_complete:false,incomplete_repos:[{id:1}]})})});
+  vm.runInContext(fs.readFileSync('static/activity.js','utf8'),sandbox);
+  vm.runInContext('renderChart=renderMostActive=renderLeastActive=renderStale=renderCommitFeed=()=>{}',sandbox);
+  await vm.runInContext('loadActivity(7)',sandbox);
+  assert.match(el('history-warning').textContent,/incomplete for 1 repositories/);
+  assert.equal(el('history-warning').classList.hidden,false);
+  console.log('History completeness and safe date rendering regressions passed');
+})().catch(err=>{console.error(err);process.exitCode=1;});

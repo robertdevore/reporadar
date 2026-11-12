@@ -1,3 +1,5 @@
+from src.metadata import redact_remote_url, normalize_commit_date
+
 // db.kujo — RepoRadar Database Layer
 // Handles SQLite schema creation, migrations, and query helpers.
 
@@ -70,6 +72,7 @@ export func configure_connection(db) {
 	db_query(db, "PRAGMA busy_timeout = 5000")
 	db_query(db, "PRAGMA journal_mode = WAL")
 	db_query(db, "PRAGMA synchronous = NORMAL")
+	db_query(db, "PRAGMA secure_delete = ON")
 }
 
 /// init_db creates/opens the database and ensures the schema is up to date.
@@ -163,8 +166,8 @@ export func create_schema_with_options(db, announce) {
 
 	db_execute(db, "CREATE TABLE IF NOT EXISTS discovery_exclusions (path TEXT PRIMARY KEY, excluded_at TEXT NOT NULL DEFAULT (datetime('now'))) ")
 
-	// Record schema version
-	db_execute(db, "INSERT OR IGNORE INTO schema_version (version) VALUES (3)")
+	// Record schema version after atomic metadata cleanup.
+	migrate_data_v4(db)
 
 	if announce {
 		print("Database initialized at: " + get_db_path())
@@ -178,8 +181,8 @@ export func ensure_schema(db) {
 	if len(tables) > 0 {
 		mut versions = db_query(db, "SELECT MAX(version) as version FROM schema_version")
 		if versions[0]["version"] != null {
-			if to_int(versions[0]["version"]) == 3 { return }
-			if to_int(versions[0]["version"]) > 3 { throw("Unsupported database schema version") }
+			if to_int(versions[0]["version"]) == 4 { return }
+			if to_int(versions[0]["version"]) > 4 { throw("Unsupported database schema version") }
 		}
 	}
 	db_execute(db, "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))")
@@ -222,9 +225,7 @@ export func ensure_schema(db) {
 
 	db_execute(db, "CREATE TABLE IF NOT EXISTS discovery_exclusions (path TEXT PRIMARY KEY, excluded_at TEXT NOT NULL DEFAULT (datetime('now'))) ")
 
-	if current_version < 3 {
-		db_execute(db, "INSERT OR IGNORE INTO schema_version (version) VALUES (3)")
-	}
+	if current_version < 4 { migrate_data_v4(db) }
 }
 
 /// get_setting retrieves a setting value by key, with an optional default.
@@ -247,4 +248,42 @@ export func set_setting(db, key, value) {
 	mut safe_key = escape_sql(key)
 	mut safe_value = escape_sql(sanitize_setting_value(key, value))
 	db_execute(db, "INSERT INTO settings (key, value) VALUES ('" + safe_key + "', '" + safe_value + "') ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+}
+
+/// Migration is restart-safe and records its version only after every update commits.
+export func migrate_data_v4(db) {
+	db_begin_immediate(db)
+	try {
+		if !table_has_column(db, "repos", "history_complete") {
+			db_execute(db, "ALTER TABLE repos ADD COLUMN history_complete INTEGER NOT NULL DEFAULT 0")
+			db_execute(db, "ALTER TABLE repos ADD COLUMN history_error TEXT NOT NULL DEFAULT 'History has not been collected'")
+			db_execute(db, "ALTER TABLE repos ADD COLUMN history_scanned_at TEXT")
+		}
+		db_execute(db,"UPDATE repos SET history_complete=0, history_error='History needs a fresh scan after metadata migration'")
+		// Process bounded batches rather than materializing every retained snapshot.
+		mut cursor = 0
+		while true {
+			mut rows = db_query(db, "SELECT id, remote_url, latest_commit_date FROM repo_status_snapshots WHERE id > " + to_string(cursor) + " ORDER BY id LIMIT 500")
+			if len(rows) == 0 { break }
+			mut i = 0
+			while i < len(rows) {
+				mut row = rows[i]; i = i + 1; cursor = to_int(row["id"])
+				db_execute(db, "UPDATE repo_status_snapshots SET remote_url='" + escape_sql(redact_remote_url(row["remote_url"])) + "', latest_commit_date='" + escape_sql(normalize_commit_date(db,row["latest_commit_date"])) + "' WHERE id=" + to_string(cursor))
+			}
+		}
+		cursor = 0
+		while true {
+			mut rows = db_query(db, "SELECT id, date FROM repo_commits WHERE id > " + to_string(cursor) + " ORDER BY id LIMIT 500")
+			if len(rows) == 0 { break }
+			mut i = 0
+			while i < len(rows) {
+				mut row = rows[i]; i = i + 1; cursor = to_int(row["id"])
+				db_execute(db, "UPDATE repo_commits SET date='" + escape_sql(normalize_commit_date(db,row["date"])) + "' WHERE id=" + to_string(cursor))
+			}
+		}
+		db_execute(db, "INSERT OR IGNORE INTO schema_version(version) VALUES (4)")
+		db_commit(db)
+	} except err { db_rollback(db); throw(err) }
+	// Old external backups are outside this database's lifecycle.
+	db_query(db, "PRAGMA wal_checkpoint(TRUNCATE)")
 }
