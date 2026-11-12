@@ -37,7 +37,7 @@ def check(interpreter):
         assert scanned['is_clean']==0 and scanned['untracked_count']==2,scanned
         assert scanned['latest_commit_author']=='Fixture---not-a-date'
         assert scanned['latest_commit_message']=='subject --- preserved'
-        assert len(scanned['latest_commit_date'])==25
+        assert len(scanned['latest_commit_date']) in (20,25)
         git('config','--unset','status.showUntrackedFiles')
         assert snippet(scan)['untracked_count']==2
         # Userinfo is redacted, but repository configuration and meaningful identity stay intact.

@@ -1,7 +1,7 @@
 // RepoRadar Scanner Unit Tests
 // Run: kujo test-run tests/test_scanner.kujo
 
-from src.scanner import parse_git_status, parse_commit_log_line, validate_repo_path, shell_quote, git_inspect_prefix, path_has_git_marker, validate_git_repo, explain_git_command_failure, parse_github_repo_slug, parse_dependabot_alert_count_output
+from src.scanner import parse_git_status, parse_commit_log_line, parse_commit_records, validate_repo_path, shell_quote, git_inspect_prefix, path_has_git_marker, validate_git_repo, explain_git_command_failure, parse_github_repo_slug, parse_dependabot_alert_count_output
 
 // === parse_git_status Tests ===
 
@@ -255,5 +255,19 @@ test_group "rename and unborn branch regressions" {
     }
     test "unborn branch uses its actual name" {
         assert_equal(parse_git_status("## No commits yet on main")["branch"], "main")
+    }
+}
+
+// Git 2.45+ uses Z for UTC; earlier Git emits +00:00. Both are strict ISO.
+test_group "NUL commit framing" {
+    test "UTC and offset timestamps with delimiter author" {
+        mut nul = parse_json("\"\\u0000\"")
+        mut base = "0123456789012345678901234567890123456789" + nul + "0123456" + nul + "Fixture---name" + nul
+        mut utc = parse_commit_records(base + "2026-11-12T00:00:00Z" + nul + "message --- safe" + nul)
+        mut offset = parse_commit_records(base + "2026-11-12T00:00:00+00:00" + nul + "message --- safe" + nul)
+        assert_equal(utc[0]["date"], "2026-11-12T00:00:00Z")
+        assert_equal(offset[0]["date"], "2026-11-12T00:00:00+00:00")
+        assert_equal(utc[0]["author"], "Fixture---name")
+        assert_equal(utc[0]["message"], "message --- safe")
     }
 }

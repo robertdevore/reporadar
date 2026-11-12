@@ -285,7 +285,8 @@ export func parse_commit_records(output) {
 	mut i = 0
 	while i < len(fields) {
 		if len(fields[i]) != 40 && len(fields[i]) != 64 { throw("Invalid Git commit identity") }
-		if len(fields[i+3]) != 25 { throw("Invalid Git commit timestamp") }
+		mut date = fields[i+3]
+		if !(len(date) == 25 || (len(date) == 20 && ends_with(date,"Z"))) { throw("Invalid Git commit timestamp") }
 		commits = push(commits, {"hash":fields[i],"short_hash":fields[i+1],"author":fields[i+2],"date":fields[i+3],"message":fields[i+4]})
 		i = i + 5
 	}
@@ -523,7 +524,7 @@ export func scan_repo_with_options(repo_path, enable_dependabot_alerts) {
 				mut commit = null
 				try { commit = get_latest_commit(repo_path) } except err {
 					result["success"] = false
-					result["error"] = "Could not read latest Git commit metadata"
+					result["error"] = "Could not read latest Git commit metadata: " + to_string(err)
 					return result
 				}
 				result["branch"] = "(detached at " + commit["short_hash"] + ")"
@@ -569,7 +570,7 @@ export func scan_repo_with_options(repo_path, enable_dependabot_alerts) {
 	mut commit = null
 	try { commit = get_latest_commit(repo_path) } except err {
 		result["success"] = false
-		result["error"] = "Could not read latest Git commit metadata"
+		result["error"] = "Could not read latest Git commit metadata: " + to_string(err)
 		return result
 	}
 	result["latest_commit_hash"] = commit["hash"]
